@@ -120,7 +120,7 @@ export default function WordTestsPage() {
         question: i.question,
         answer: i.answer,
       })));
-      setExtractMsg(`${data.ai === "claude" ? "Claude" : "Grok"}가 ${data.items.length}개 단어를 추출했습니다. 확인 후 저장하세요.`);
+      setExtractMsg(`${data.ai === "claude" ? "Claude" : data.ai === "gemini" ? "Gemini" : "Grok"}가 ${data.items.length}개 단어를 추출했습니다. 확인 후 저장하세요.`);
     } catch (err: unknown) {
       setExtractMsg(err instanceof Error ? err.message : "오류 발생");
     } finally {
