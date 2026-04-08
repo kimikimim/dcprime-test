@@ -1,71 +1,97 @@
 "use client";
-import { useState } from "react";
+import { useState, useRef } from "react";
 import Link from "next/link";
 import LogoutButton from "./LogoutButton";
 
-const entranceNav = [
-  { href: "/students", label: "원생 관리" },
-  { href: "/tests", label: "테스트 관리" },
-  { href: "/results", label: "결과 조회" },
-  { href: "/results/new", label: "결과 입력" },
-  { href: "/analytics", label: "분석" },
-  { href: "/classes", label: "반 배정" },
-  { href: "/historical", label: "역대 이력" },
+const menus = [
+  {
+    label: "입학테스트",
+    items: [
+      { href: "/students", label: "원생 관리" },
+      { href: "/tests", label: "테스트 관리" },
+      { href: "/results", label: "결과 조회" },
+      { href: "/results/new", label: "결과 입력" },
+      { href: "/analytics", label: "분석" },
+      { href: "/classes", label: "반 배정" },
+      { href: "/historical", label: "역대 이력" },
+    ],
+  },
+  {
+    label: "영어",
+    items: [
+      { href: "/word-tests", label: "단어시험 관리" },
+      { href: "/word-submissions", label: "단어시험 채점" },
+      { href: "/unmatched-submissions", label: "매칭 불가" },
+      { href: "/word-tutoring", label: "튜터링 기록" },
+      { href: "/word-config", label: "채점 설정" },
+      { href: "/word-answer-key", label: "답지 등록" },
+    ],
+  },
+  {
+    label: "수학",
+    items: [
+      { href: "/math-tests", label: "시험 관리" },
+      { href: "/math-submissions", label: "OMR 채점" },
+      { href: "/math-tutoring", label: "튜터링 기록" },
+    ],
+  },
 ];
 
-const wordNav = [
-  { href: "/word-tests", label: "단어시험 관리" },
-  { href: "/word-submissions", label: "단어시험 채점" },
-  { href: "/unmatched-submissions", label: "매칭 불가" },
-  { href: "/word-tutoring", label: "튜터링 기록" },
-  { href: "/word-config", label: "채점 설정" },
-  { href: "/word-answer-key", label: "답지 등록" },
-];
+function DropdownMenu({ label, items }: { label: string; items: { href: string; label: string }[] }) {
+  const [open, setOpen] = useState(false);
+  const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-const mathNav = [
-  { href: "/math-tests", label: "시험 관리" },
-  { href: "/math-submissions", label: "OMR 채점" },
-  { href: "/math-tutoring", label: "튜터링 기록" },
-];
+  const show = () => {
+    if (timeoutRef.current) clearTimeout(timeoutRef.current);
+    setOpen(true);
+  };
+  const hide = () => {
+    timeoutRef.current = setTimeout(() => setOpen(false), 100);
+  };
+
+  return (
+    <div className="relative flex items-stretch" onMouseEnter={show} onMouseLeave={hide}>
+      <button
+        onClick={() => setOpen((v) => !v)}
+        className="flex items-center gap-1 px-4 h-full hover:bg-indigo-600 dark:hover:bg-indigo-800 text-sm font-medium transition-colors whitespace-nowrap"
+      >
+        {label}
+        <svg className={`w-3 h-3 transition-transform ${open ? "rotate-180" : ""}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+        </svg>
+      </button>
+      {open && (
+        <div className="absolute top-full left-0 z-50 bg-indigo-800 dark:bg-indigo-950 shadow-xl rounded-b-xl overflow-hidden min-w-36"
+          onMouseEnter={show} onMouseLeave={hide}>
+          {items.map((n) => (
+            <Link key={n.href} href={n.href} onClick={() => setOpen(false)}
+              className="block px-4 py-2.5 text-sm hover:bg-indigo-600 dark:hover:bg-indigo-800 transition-colors whitespace-nowrap">
+              {n.label}
+            </Link>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
 
 export default function NavBar() {
   const [open, setOpen] = useState(false);
+  const [mobileOpen, setMobileOpen] = useState<string | null>(null);
 
   return (
-    <nav className="bg-indigo-700 dark:bg-indigo-900 text-white shadow-lg">
+    <nav className="bg-indigo-700 dark:bg-indigo-900 text-white shadow-lg relative z-40">
       {/* 데스크탑 */}
-      <div className="hidden lg:flex items-stretch h-12 overflow-x-auto">
+      <div className="hidden lg:flex items-stretch h-12">
         <Link href="/" className="font-bold text-base flex items-center px-5 border-r border-indigo-500/50 hover:bg-indigo-600 transition-colors shrink-0">
           DCPRIME
         </Link>
-        <div className="flex items-stretch">
-          <span className="text-indigo-300 text-xs flex items-center px-3 border-r border-indigo-500/50 shrink-0">입학테스트</span>
-          {entranceNav.map((n) => (
-            <Link key={n.href} href={n.href}
-              className="flex items-center px-3 hover:bg-indigo-600 dark:hover:bg-indigo-800 text-sm font-medium transition-colors whitespace-nowrap">
-              {n.label}
-            </Link>
+        <div className="flex items-stretch border-r border-indigo-500/50">
+          {menus.map((m) => (
+            <DropdownMenu key={m.label} label={m.label} items={m.items} />
           ))}
         </div>
-        <div className="flex items-stretch border-l border-indigo-500/50">
-          <span className="text-indigo-300 text-xs flex items-center px-3 border-r border-indigo-500/50 shrink-0">영어단어</span>
-          {wordNav.map((n) => (
-            <Link key={n.href} href={n.href}
-              className="flex items-center px-3 hover:bg-indigo-600 dark:hover:bg-indigo-800 text-sm font-medium transition-colors whitespace-nowrap">
-              {n.label}
-            </Link>
-          ))}
-        </div>
-        <div className="flex items-stretch border-l border-indigo-500/50">
-          <span className="text-indigo-300 text-xs flex items-center px-3 border-r border-indigo-500/50 shrink-0">수학</span>
-          {mathNav.map((n) => (
-            <Link key={n.href} href={n.href}
-              className="flex items-center px-3 hover:bg-indigo-600 dark:hover:bg-indigo-800 text-sm font-medium transition-colors whitespace-nowrap">
-              {n.label}
-            </Link>
-          ))}
-        </div>
-        <div className="ml-auto flex items-center px-4 border-l border-indigo-500/50">
+        <div className="ml-auto flex items-center px-4">
           <LogoutButton />
         </div>
       </div>
@@ -73,11 +99,7 @@ export default function NavBar() {
       {/* 모바일 헤더 */}
       <div className="lg:hidden flex items-center justify-between px-4 h-12">
         <Link href="/" className="font-bold text-base">DCPRIME</Link>
-        <button
-          onClick={() => setOpen(!open)}
-          className="p-2 rounded-lg hover:bg-indigo-600 transition-colors"
-          aria-label="메뉴"
-        >
+        <button onClick={() => setOpen(!open)} className="p-2 rounded-lg hover:bg-indigo-600 transition-colors" aria-label="메뉴">
           {open ? (
             <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
@@ -93,40 +115,30 @@ export default function NavBar() {
       {/* 모바일 드로어 */}
       {open && (
         <div className="lg:hidden border-t border-indigo-500/50 pb-2">
-          <div className="px-4 pt-3 pb-1">
-            <p className="text-indigo-300 text-xs font-semibold uppercase tracking-wider mb-2">입학테스트</p>
-            <div className="grid grid-cols-3 gap-1">
-              {entranceNav.map((n) => (
-                <Link key={n.href} href={n.href} onClick={() => setOpen(false)}
-                  className="text-sm py-2 px-3 rounded-lg hover:bg-indigo-600 transition-colors text-center">
-                  {n.label}
-                </Link>
-              ))}
+          {menus.map((m) => (
+            <div key={m.label} className="border-b border-indigo-500/30">
+              <button
+                onClick={() => setMobileOpen(mobileOpen === m.label ? null : m.label)}
+                className="w-full flex items-center justify-between px-4 py-3 text-sm font-semibold hover:bg-indigo-600 transition-colors"
+              >
+                {m.label}
+                <svg className={`w-4 h-4 transition-transform ${mobileOpen === m.label ? "rotate-180" : ""}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                </svg>
+              </button>
+              {mobileOpen === m.label && (
+                <div className="grid grid-cols-3 gap-1 px-4 pb-3">
+                  {m.items.map((n) => (
+                    <Link key={n.href} href={n.href} onClick={() => setOpen(false)}
+                      className="text-sm py-2 px-3 rounded-lg hover:bg-indigo-600 transition-colors text-center">
+                      {n.label}
+                    </Link>
+                  ))}
+                </div>
+              )}
             </div>
-          </div>
-          <div className="px-4 pt-2 pb-1 border-t border-indigo-500/30 mt-1">
-            <p className="text-indigo-300 text-xs font-semibold uppercase tracking-wider mb-2">영어단어 튜터링</p>
-            <div className="grid grid-cols-3 gap-1">
-              {wordNav.map((n) => (
-                <Link key={n.href} href={n.href} onClick={() => setOpen(false)}
-                  className="text-sm py-2 px-3 rounded-lg hover:bg-indigo-600 transition-colors text-center">
-                  {n.label}
-                </Link>
-              ))}
-            </div>
-          </div>
-          <div className="px-4 pt-2 pb-1 border-t border-indigo-500/30 mt-1">
-            <p className="text-indigo-300 text-xs font-semibold uppercase tracking-wider mb-2">수학</p>
-            <div className="grid grid-cols-3 gap-1">
-              {mathNav.map((n) => (
-                <Link key={n.href} href={n.href} onClick={() => setOpen(false)}
-                  className="text-sm py-2 px-3 rounded-lg hover:bg-indigo-600 transition-colors text-center">
-                  {n.label}
-                </Link>
-              ))}
-            </div>
-          </div>
-          <div className="px-4 pt-2 border-t border-indigo-500/30 mt-1 flex justify-end">
+          ))}
+          <div className="px-4 pt-2 flex justify-end">
             <LogoutButton />
           </div>
         </div>
