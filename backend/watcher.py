@@ -928,12 +928,20 @@ direction: 한→영이면 KR_EN, 영→한이면 EN_KR."""
         for idx, item in enumerate(all_items, 1):
             item["item_no"] = idx
 
+        # EN_KR(영→한): AI는 항상 question=한국어/answer=영어로 추출하므로
+        # 방향이 영→한이면 question(영어)↔answer(한국어) 스왑
+        is_en_kr = word_test.direction == "EN_KR"
+
         for item in all_items:
+            q = item.get("question", "")
+            a = item.get("answer", "")
+            if is_en_kr:
+                q, a = a, q  # 영어↔한국어 뒤집기
             db.add(models.WordTestItem(
                 word_test_id=word_test.id,
                 item_no=item["item_no"],
-                question=item.get("question", ""),
-                answer=item.get("answer", ""),
+                question=q,
+                answer=a,
                 day=item.get("day"),
             ))
         db.commit()
