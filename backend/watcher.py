@@ -766,11 +766,14 @@ def _extract_hwp_text(filepath: Path) -> str:
 
 # ── 답지 자동 등록 ─────────────────────────────────────────────
 def _process_entrance_answer_key(filepath: Path):
-    """입학테스트 답지(HWP/PDF) → DB 자동 등록"""
-    db = SessionLocal()
+    """입학테스트 답지(HWP/PDF) → DB 자동 등록
+    AI 호출 완료 후 DB 연결 → 연결 점유 최소화
+    """
+    print(f"[Watcher] 입학테스트 답지 처리: {filepath.name}")
     try:
-        print(f"[Watcher] 입학테스트 답지 처리: {filepath.name}")
         ext = filepath.suffix.lower()
+
+        # ── Step 1: AI 추출 (DB 연결 없음) ──────────────────────────
         if ext in HWP_EXT:
             text = _extract_hwp_text(filepath)
             prompt = f"""다음은 입학 시험 정답지 텍스트입니다:\n{text}\n\n다음 정보를 JSON으로 추출하세요. 다른 텍스트 없이 JSON만:\n{{"title":"시험 제목","grade":"학년(중1/중2/중3/고1/고2/고3)","subject":"과목","test_date":"YYYY-MM-DD","answers":{{"1":"3","2":"①"}}}}
@@ -791,27 +794,32 @@ test_date가 없으면 오늘 날짜로."""
         except Exception:
             test_date = date.today()
 
-        test = models.Test(
-            title=data["title"],
-            grade=data["grade"],
-            subject=data.get("subject", ""),
-            question_count=len(answers),
-            answers=answers,
-            test_date=test_date,
-        )
-        db.add(test)
-        db.commit()
+        # ── Step 2: DB INSERT (AI 끝난 후) ──────────────────────────
+        db = SessionLocal()
+        try:
+            test = models.Test(
+                title=data["title"],
+                grade=data["grade"],
+                subject=data.get("subject", ""),
+                question_count=len(answers),
+                answers=answers,
+                test_date=test_date,
+            )
+            db.add(test)
+            db.commit()
+        except Exception:
+            db.rollback()
+            raise
+        finally:
+            db.close()
 
         done_dir = ANSWER_ENTRANCE / "등록완료"
         done_dir.mkdir(exist_ok=True)
         shutil.move(str(filepath), str(_unique_dest(done_dir / filepath.name)))
         print(f"[Watcher] ✓ 입학테스트 등록: {data['title']} ({len(answers)}문항)")
     except Exception as e:
-        db.rollback()
         print(f"[Watcher] ✗ 입학테스트 답지 등록 실패: {e}")
         _move_to_error(filepath)
-    finally:
-        db.close()
 
 
 def _extract_pdf_text(filepath: Path) -> str:
@@ -868,24 +876,26 @@ JSON 배열로만 응답 (다른 텍스트 없이):
 
 
 def _process_word_answer_key(filepath: Path):
-    """영어단어 답지(HWP/PDF) → DB 자동 등록 (DAY별 청크 처리)"""
+    """영어단어 답지(HWP/PDF) → DB 자동 등록 (DAY별 청크 처리)
+    AI 호출(느림)을 DB 연결 없이 먼저 완료 → DB는 INSERT 직전에만 열어 연결 점유 최소화
+    """
     import traceback
-    db = SessionLocal()
+    print(f"[Watcher] 영어단어 답지 처리: {filepath.name}")
     try:
-        print(f"[Watcher] 영어단어 답지 처리: {filepath.name}")
         ext = filepath.suffix.lower()
 
-        # 1. 메타정보 추출 (title, grade, direction)
-        meta_prompt = """이 영어 단어장의 메타정보만 JSON으로 추출하세요. 다른 텍스트 없이 JSON만:
-{"title":"단어장 이름(예:능률 VOCA 고등 기본)","grade":"학년(중1/중2/중3/고1/고2/고3)","direction":"KR_EN 또는 EN_KR","total_days":60}
-direction: 한→영이면 KR_EN, 영→한이면 EN_KR."""
-
+        # ── Step 1: 텍스트 추출 (DB 연결 없음) ──────────────────────
         if ext in HWP_EXT:
             full_text = _extract_hwp_text(filepath)
         else:
             full_text = _extract_pdf_text(filepath)
 
         is_text_pdf = len(full_text.strip()) > 200
+
+        # ── Step 2: 메타정보 AI 추출 (DB 연결 없음) ─────────────────
+        meta_prompt = """이 영어 단어장의 메타정보만 JSON으로 추출하세요. 다른 텍스트 없이 JSON만:
+{"title":"단어장 이름(예:능률 VOCA 고등 기본)","grade":"학년(중1/중2/중3/고1/고2/고3)","direction":"KR_EN 또는 EN_KR","total_days":60}
+direction: 한→영이면 KR_EN, 영→한이면 EN_KR."""
 
         if is_text_pdf:
             meta_response = ai_text_call(f"다음은 영어 단어장 텍스트 앞부분입니다:\n{full_text[:2000]}\n\n{meta_prompt}", max_tokens=500, fast=True)
@@ -895,17 +905,7 @@ direction: 한→영이면 KR_EN, 영→한이면 EN_KR."""
         meta = _parse_json(meta_response)
         print(f"[Watcher] 메타 추출 완료: {meta.get('title')} ({meta.get('grade')})")
 
-        from datetime import datetime as _dt
-        word_test = models.WordTest(
-            title=meta["title"],
-            grade=meta["grade"],
-            direction=meta.get("direction", "KR_EN"),
-            test_date=date.today(),
-        )
-        db.add(word_test)
-        db.flush()
-
-        # 2. 단어 추출: 텍스트 PDF는 DAY별 청크, 스캔 PDF는 단일 호출
+        # ── Step 3: 단어 AI 추출 (DB 연결 없음) ─────────────────────
         all_items = []
         if is_text_pdf:
             day_sections = _split_text_by_day(full_text)
@@ -916,7 +916,6 @@ direction: 한→영이면 KR_EN, 영→한이면 EN_KR."""
                     all_items.extend(items)
                     print(f"[Watcher] DAY {day_no}: {len(items)}개 추출 (누적 {len(all_items)}개)")
             else:
-                # DAY 구분 없는 경우 → 2000자씩 청크
                 print(f"[Watcher] DAY 구분 없음, 청크별 추출")
                 chunk_size = 2000
                 for i in range(0, len(full_text), chunk_size):
@@ -926,7 +925,6 @@ direction: 한→영이면 KR_EN, 영→한이면 EN_KR."""
                     items = _extract_items_from_text_chunk(chunk, i // chunk_size + 1, len(all_items))
                     all_items.extend(items)
         else:
-            # 스캔 PDF: 단일 AI 호출 (페이지 수 적을 때만 현실적)
             word_prompt = """이 영어 단어장 이미지에서 모든 단어를 추출하세요. JSON 배열로만:
 [{"item_no":1,"question":"한국어뜻","answer":"영어단어"}, ...]"""
             response = _ai_call(str(filepath), word_prompt, max_tokens=8000, fast=True)
@@ -936,35 +934,49 @@ direction: 한→영이면 KR_EN, 영→한이면 EN_KR."""
         for idx, item in enumerate(all_items, 1):
             item["item_no"] = idx
 
-        # EN_KR(영→한): AI는 항상 question=한국어/answer=영어로 추출하므로
-        # 방향이 영→한이면 question(영어)↔answer(한국어) 스왑
-        is_en_kr = word_test.direction == "EN_KR"
+        is_en_kr = meta.get("direction", "KR_EN") == "EN_KR"
 
-        # 100개씩 나눠서 커밋 (대용량 파일 시 DB 연결 끊김 방지)
-        BATCH = 100
-        for batch_start in range(0, len(all_items), BATCH):
-            batch = all_items[batch_start:batch_start + BATCH]
-            for item in batch:
-                q = item.get("question", "")
-                a = item.get("answer", "")
-                if is_en_kr:
-                    q, a = a, q
-                db.add(models.WordTestItem(
-                    word_test_id=word_test.id,
-                    item_no=item["item_no"],
-                    question=q,
-                    answer=a,
-                    day=item.get("day"),
-                ))
-            db.flush()  # 배치별 flush, 최종 commit은 아래서
-        db.commit()
+        # ── Step 4: DB 연결 → INSERT (AI 호출 끝난 후) ──────────────
+        db = SessionLocal()
+        try:
+            word_test = models.WordTest(
+                title=meta["title"],
+                grade=meta["grade"],
+                direction=meta.get("direction", "KR_EN"),
+                test_date=date.today(),
+            )
+            db.add(word_test)
+            db.commit()  # word_test ID 확정 + 연결 즉시 반환
+
+            db.refresh(word_test)  # ID reload
+
+            BATCH = 50
+            for batch_start in range(0, len(all_items), BATCH):
+                batch = all_items[batch_start:batch_start + BATCH]
+                for item in batch:
+                    q = item.get("question", "")
+                    a = item.get("answer", "")
+                    if is_en_kr:
+                        q, a = a, q
+                    db.add(models.WordTestItem(
+                        word_test_id=word_test.id,
+                        item_no=item["item_no"],
+                        question=q,
+                        answer=a,
+                        day=item.get("day"),
+                    ))
+                db.commit()  # 배치마다 commit → 트랜잭션 짧게 유지
+        except Exception:
+            db.rollback()
+            raise
+        finally:
+            db.close()
 
         done_dir = ANSWER_WORD / "등록완료"
         done_dir.mkdir(exist_ok=True)
         shutil.move(str(filepath), str(_unique_dest(done_dir / filepath.name)))
         print(f"[Watcher] ✓ 영어단어 등록: {meta['title']} ({len(all_items)}문항)")
     except Exception as e:
-        db.rollback()
         print(f"[Watcher] ✗ 영어단어 답지 등록 실패: {e}")
         print(traceback.format_exc())
         _move_to_error(filepath)
@@ -1110,17 +1122,17 @@ def _process_math_answer_key(filepath: Path):
     """수학 답지(PDF/이미지) → math_tests DB 자동 등록
     - 이미지/스캔PDF (OMR): Haiku 사용
     - 텍스트 PDF (일반 답지): Sonnet 사용
+    AI 호출 완료 후 DB 연결 → 연결 점유 최소화
     """
-    db = SessionLocal()
+    print(f"[Watcher] 수학 답지 처리: {filepath.name}")
     try:
-        print(f"[Watcher] 수학 답지 처리: {filepath.name}")
         ext = filepath.suffix.lower()
 
-        # OMR 여부 판단: 이미지거나 텍스트 추출 안 되는 PDF면 OMR
+        # ── Step 1: AI 추출 (DB 연결 없음) ──────────────────────────
         is_omr = ext in IMAGE_EXTS
         if not is_omr and ext in PDF_EXT:
             extracted = _extract_pdf_text(filepath)
-            is_omr = len(extracted.strip()) < 200  # 텍스트 없으면 스캔(OMR)
+            is_omr = len(extracted.strip()) < 200
 
         if is_omr:
             print(f"[Watcher] 수학 답지 → OMR 형식 (Haiku)")
@@ -1139,8 +1151,8 @@ answers는 문항 순서대로의 정답 번호 배열(1~5). test_date 없으면
 {{"title": "시험 제목", "grade": "학년(중1/중2/중3/고1/고2/고3)", "test_date": "YYYY-MM-DD", "answers": [3, 1, 4, 1, 5]}}
 answers는 문항 순서대로의 정답 번호 배열(1~5). test_date 없으면 오늘 날짜({date.today()})."""
             response = _ai_call(str(filepath), prompt, max_tokens=2000, fast=False)
-        data = _parse_json(response)
 
+        data = _parse_json(response)
         from datetime import datetime as _dt
         try:
             test_date = _dt.strptime(data["test_date"], "%Y-%m-%d").date()
@@ -1150,27 +1162,32 @@ answers는 문항 순서대로의 정답 번호 배열(1~5). test_date 없으면
         answers = [int(a) for a in data.get("answers", [])]
         title = data.get("title") or filepath.stem
 
-        test = models.MathTest(
-            title=title,
-            grade=data.get("grade", "미상"),
-            test_date=test_date,
-            num_questions=len(answers),
-            answers=answers,
-            source_file=filepath.name,
-        )
-        db.add(test)
-        db.commit()
+        # ── Step 2: DB INSERT (AI 끝난 후) ──────────────────────────
+        db = SessionLocal()
+        try:
+            test = models.MathTest(
+                title=title,
+                grade=data.get("grade", "미상"),
+                test_date=test_date,
+                num_questions=len(answers),
+                answers=answers,
+                source_file=filepath.name,
+            )
+            db.add(test)
+            db.commit()
+        except Exception:
+            db.rollback()
+            raise
+        finally:
+            db.close()
 
         done_dir = ANSWER_MATH / "등록완료"
         done_dir.mkdir(exist_ok=True)
         shutil.move(str(filepath), str(_unique_dest(done_dir / filepath.name)))
         print(f"[Watcher] ✓ 수학 답지 등록: {title} ({len(answers)}문항)")
     except Exception as e:
-        db.rollback()
         print(f"[Watcher] ✗ 수학 답지 등록 실패: {e}")
         _move_to_error(filepath)
-    finally:
-        db.close()
 
 
 # ── Watchdog 핸들러 ────────────────────────────────────────────
