@@ -576,6 +576,7 @@ def _build_marked_pdf(s: WordSubmission) -> bytes:
 @router.get("/{sub_id}/marked-pdf")
 def get_marked_pdf(sub_id: int, db: Session = Depends(get_db)):
     """원본 이미지 + 빨간 펜 채점 결과 PDF 생성 및 반환"""
+    from urllib.parse import quote
     s = db.query(WordSubmission).filter(WordSubmission.id == sub_id).first()
     if not s:
         raise HTTPException(404, "Not found")
@@ -586,7 +587,7 @@ def get_marked_pdf(sub_id: int, db: Session = Depends(get_db)):
     return StreamingResponse(
         io.BytesIO(pdf_bytes),
         media_type="application/pdf",
-        headers={"Content-Disposition": f"attachment; filename*=UTF-8''{fname}"},
+        headers={"Content-Disposition": f"attachment; filename=\"result.pdf\"; filename*=UTF-8''{quote(fname)}"},
     )
 
 
