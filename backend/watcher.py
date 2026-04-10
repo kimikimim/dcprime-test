@@ -932,18 +932,23 @@ direction: 한→영이면 KR_EN, 영→한이면 EN_KR."""
         # 방향이 영→한이면 question(영어)↔answer(한국어) 스왑
         is_en_kr = word_test.direction == "EN_KR"
 
-        for item in all_items:
-            q = item.get("question", "")
-            a = item.get("answer", "")
-            if is_en_kr:
-                q, a = a, q  # 영어↔한국어 뒤집기
-            db.add(models.WordTestItem(
-                word_test_id=word_test.id,
-                item_no=item["item_no"],
-                question=q,
-                answer=a,
-                day=item.get("day"),
-            ))
+        # 100개씩 나눠서 커밋 (대용량 파일 시 DB 연결 끊김 방지)
+        BATCH = 100
+        for batch_start in range(0, len(all_items), BATCH):
+            batch = all_items[batch_start:batch_start + BATCH]
+            for item in batch:
+                q = item.get("question", "")
+                a = item.get("answer", "")
+                if is_en_kr:
+                    q, a = a, q
+                db.add(models.WordTestItem(
+                    word_test_id=word_test.id,
+                    item_no=item["item_no"],
+                    question=q,
+                    answer=a,
+                    day=item.get("day"),
+                ))
+            db.flush()  # 배치별 flush, 최종 commit은 아래서
         db.commit()
 
         done_dir = ANSWER_WORD / "등록완료"
