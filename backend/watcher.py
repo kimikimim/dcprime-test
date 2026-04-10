@@ -1239,6 +1239,20 @@ def _scan_existing():
         if ext in IMAGE_EXTS or ext in PDF_EXT:
             Thread(target=_process_math_answer_key, args=(filepath,), daemon=True).start()
 
+    for filepath in ANSWER_WORD.iterdir():
+        if not filepath.is_file():
+            continue
+        ext = filepath.suffix.lower()
+        if ext in PDF_EXT or ext in HWP_EXT:
+            Thread(target=_process_word_answer_key, args=(filepath,), daemon=True).start()
+
+    for filepath in ANSWER_ENTRANCE.iterdir():
+        if not filepath.is_file():
+            continue
+        ext = filepath.suffix.lower()
+        if ext in PDF_EXT or ext in HWP_EXT:
+            Thread(target=_process_entrance_answer_key, args=(filepath,), daemon=True).start()
+
 
 def start_watcher():
     global _observer
