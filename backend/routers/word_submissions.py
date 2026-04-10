@@ -486,61 +486,47 @@ def reopen_submission(sub_id: int, db: Session = Depends(get_db)):
 
 
 def _build_marked_pdf(s: WordSubmission) -> bytes:
-    """빨간펜 채점 결과 PDF bytes 생성 (원본 이미지 1p + 채점 결과 2p~)"""
+    """빨간펜 채점 결과 PDF bytes 생성 (채점 결과만, 원본 이미지 없음)
+    60문항 기준 1페이지 수용 (row_h=22)
+    """
     import fitz
 
     doc  = fitz.open()
-    font = _get_font(doc)
 
-    # ── 1페이지: 원본 이미지 ──────────────────────────────────
-    page1 = doc.new_page(width=595, height=842)
-    if s.image_path:
-        img_path = Path(s.image_path)
-        if img_path.exists():
-            ext = img_path.suffix.lower()
-            if ext == ".pdf":
-                src = fitz.open(str(img_path))
-                if src.page_count > 0:
-                    pix = src[0].get_pixmap(dpi=150)
-                    page1.insert_image(fitz.Rect(0, 0, 595, 842), pixmap=pix)
-                src.close()
-            else:
-                page1.insert_image(fitz.Rect(0, 0, 595, 842), filename=str(img_path))
-
-    # ── 2페이지: 채점 결과 (빨간 펜 스타일) ───────────────────
-    page2    = doc.new_page(width=595, height=842)
-    font2    = _get_font(doc)
-    test_ttl = s.word_test.title if s.word_test else ""
-    pct      = round(s.score / s.total * 100) if (s.total and s.score is not None) else 0
+    # ── 채점 결과 페이지 ──────────────────────────────────────
+    page  = doc.new_page(width=595, height=842)
+    font  = _get_font(doc)
+    test_ttl  = s.word_test.title if s.word_test else ""
+    pct       = round(s.score / s.total * 100) if (s.total and s.score is not None) else 0
     wrong_nos = [i.item_no for i in s.items if i.is_correct is False]
 
-    y = 45
-    _insert_text_kr(page2, (50, y),      s.student_name,              font2, size=16, color=(0.05, 0.05, 0.05))
-    _insert_text_kr(page2, (50, y + 24), f"{test_ttl}  |  {s.grade}", font2, size=11, color=(0.4, 0.4, 0.4))
+    # 헤더
+    y = 40
+    _insert_text_kr(page, (50, y),      s.student_name,              font, size=15, color=(0.05, 0.05, 0.05))
+    _insert_text_kr(page, (50, y + 20), f"{test_ttl}  |  {s.grade}", font, size=10, color=(0.4, 0.4, 0.4))
     score_clr = (0.8, 0, 0) if pct < 70 else (0, 0.5, 0)
-    _insert_text_kr(page2, (400, y),
-        f"{s.score} / {s.total}  ({pct}%)", font2, size=14, color=score_clr)
+    _insert_text_kr(page, (400, y), f"{s.score} / {s.total}  ({pct}%)", font, size=13, color=score_clr)
 
     if wrong_nos:
         wrong_str = "틀린 문항: " + ", ".join(str(n) for n in sorted(wrong_nos))
-        _insert_text_kr(page2, (50, y + 46), wrong_str, font2, size=10, color=(0.8, 0, 0))
+        _insert_text_kr(page, (50, y + 38), wrong_str, font, size=9, color=(0.8, 0, 0))
 
-    y += 75
-    page2.draw_line((50, y), (545, y), color=(0.8, 0.1, 0.1), width=1.2)
-    y += 14
+    y += 60
+    page.draw_line((50, y), (545, y), color=(0.8, 0.1, 0.1), width=1.2)
+    y += 12
 
     col_w   = 240
     col_gap = 15
     col_x   = [50, 50 + col_w + col_gap]
-    row_h   = 36
+    row_h   = 22   # 60문항(30행) × 22 = 660px → 헤더 포함 832px 내 수용
     col_idx = 0
 
     for item in sorted(s.items, key=lambda x: x.item_no):
         cx = col_x[col_idx]
-        if y > 800:
-            page2   = doc.new_page(width=595, height=842)
-            font2   = _get_font(doc)
-            y       = 50
+        if y > 820:
+            page    = doc.new_page(width=595, height=842)
+            font    = _get_font(doc)
+            y       = 40
             col_idx = 0
             cx      = col_x[0]
 
@@ -551,16 +537,16 @@ def _build_marked_pdf(s: WordSubmission) -> bytes:
         else:
             mark, mark_clr, text_clr = "△", (0.75, 0.45, 0), (0.4, 0.4, 0.4)
 
-        page2.draw_circle(fitz.Point(cx + 10, y - 3), 9, color=mark_clr, fill=mark_clr if item.is_correct is False else None)
-        _insert_text_kr(page2, (cx + 6, y),  mark,                                       font2, size=11, color=(1,1,1) if item.is_correct is False else mark_clr)
-        _insert_text_kr(page2, (cx + 24, y), f"{item.item_no}. {item.question or ''}",   font2, size=10, color=text_clr)
+        page.draw_circle(fitz.Point(cx + 8, y - 2), 7, color=mark_clr, fill=mark_clr if item.is_correct is False else None)
+        _insert_text_kr(page, (cx + 4, y),   mark,                                      font, size=9,  color=(1,1,1) if item.is_correct is False else mark_clr)
+        _insert_text_kr(page, (cx + 20, y),  f"{item.item_no}. {item.question or ''}",  font, size=9,  color=text_clr)
 
         if item.is_correct is False:
             stu = item.student_answer or "(무응답)"
             cor = item.correct_answer or ""
-            _insert_text_kr(page2, (cx + 24, y + 13), f"  학생: {stu}  →  정답: {cor}", font2, size=9, color=(0.7, 0.0, 0.0))
+            _insert_text_kr(page, (cx + 20, y + 11), f"  {stu} → {cor}", font, size=8, color=(0.7, 0.0, 0.0))
         elif item.is_correct is True:
-            _insert_text_kr(page2, (cx + 24, y + 13), f"  {item.student_answer or ''}",  font2, size=9, color=(0.3, 0.3, 0.3))
+            _insert_text_kr(page, (cx + 20, y + 11), f"  {item.student_answer or ''}", font, size=8, color=(0.3, 0.3, 0.3))
 
         col_idx += 1
         if col_idx == 2:
