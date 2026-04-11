@@ -71,14 +71,23 @@ def list_historical(
     students = q.order_by(models.HistoricalStudent.created_at.desc()).all()
     result = []
     for s in students:
-        qcount = db.query(models.HistoricalQuestionResult).filter(
+        qrows = db.query(models.HistoricalQuestionResult).filter(
             models.HistoricalQuestionResult.historical_student_id == s.id
-        ).count()
+        ).all()
+        qmax = max((r.question_no for r in qrows), default=0)
+        correct = sum(1 for r in qrows if r.is_correct)
+
+        score = s.score
+        total = s.total if s.total else (qmax or None)
+        score_pct = s.score_pct
+        if score_pct is None and qmax > 0:
+            score_pct = round(correct / qmax * 100)
+
         result.append(HistoricalStudentOut(
             id=s.id, name=s.name, grade=s.grade, school=s.school,
-            subject=s.subject, score=s.score, total=s.total,
-            score_pct=s.score_pct, outcome=s.outcome, source_file=s.source_file,
-            question_count=qcount
+            subject=s.subject, score=score, total=total,
+            score_pct=score_pct, outcome=s.outcome, source_file=s.source_file,
+            question_count=qmax
         ))
     return result
 
