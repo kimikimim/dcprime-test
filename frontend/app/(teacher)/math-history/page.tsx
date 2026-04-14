@@ -270,184 +270,186 @@ export default function MathHistoryPage() {
       {/* ───── 개별 성적 탭 ───── */}
       {tab === "individual" && (
       <div>
-      {/* 학생 선택 */}
-      <div className="flex gap-3 items-center mb-6">
-        <select value={selectedId} onChange={(e) => setSelectedId(e.target.value)} className={inputCls + " w-52"}>
-          <option value="">학생 선택...</option>
-          {students.map((s) => (
-            <option key={s.id} value={s.id}>{s.name} ({s.grade})</option>
-          ))}
-        </select>
-        {selected && graded.length > 0 && (
-          <span className="text-sm text-gray-500 dark:text-gray-400">총 {graded.length}회 시험</span>
-        )}
-      </div>
-
-      {!selectedId && (
-        <div className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl p-12 text-center text-gray-400 dark:text-gray-500 shadow-sm">
-          학생을 선택하면 성적 추이를 확인할 수 있습니다
-        </div>
-      )}
-      {selectedId && loading && <div className="text-center text-gray-400 py-12">불러오는 중...</div>}
-      {selectedId && !loading && graded.length === 0 && (
-        <div className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl p-12 text-center text-gray-400 dark:text-gray-500 shadow-sm">
-          채점 완료된 시험이 없습니다
-        </div>
-      )}
-
-      {selectedId && !loading && graded.length > 0 && (
-        <div className="space-y-5">
-
-          {/* 요약 카드 */}
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-            <div className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl p-4 shadow-sm">
-              <p className="text-xs text-gray-400 dark:text-gray-500 mb-1">최근 점수</p>
-              <p className="text-2xl font-bold text-orange-600 dark:text-orange-400">{latest.pct}%</p>
-              <p className="text-xs text-gray-400 mt-1">{latest.score}/{latest.total}점</p>
-            </div>
-            <div className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl p-4 shadow-sm">
-              <p className="text-xs text-gray-400 dark:text-gray-500 mb-1">내 평균</p>
-              <p className="text-2xl font-bold text-indigo-600 dark:text-indigo-400">{myAvg}%</p>
-              {classAvgAvg != null && (
-                <p className="text-xs mt-1" style={{ color: (myAvg ?? 0) >= classAvgAvg ? "#22c55e" : "#ef4444" }}>
-                  반평균 {classAvgAvg}% ({(myAvg ?? 0) >= classAvgAvg ? "▲" : "▼"}{Math.abs((myAvg ?? 0) - classAvgAvg)}%p)
-                </p>
-              )}
-            </div>
-            <div className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl p-4 shadow-sm">
-              <p className="text-xs text-gray-400 dark:text-gray-500 mb-1">전회 대비</p>
-              {diff !== null ? (
-                <p className={`text-2xl font-bold ${diff > 0 ? "text-green-600 dark:text-green-400" : diff < 0 ? "text-red-500 dark:text-red-400" : "text-gray-500"}`}>
-                  {diff > 0 ? "+" : ""}{diff}%
-                </p>
-              ) : (
-                <p className="text-2xl font-bold text-gray-300 dark:text-gray-600">-</p>
-              )}
-            </div>
-            <div className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl p-4 shadow-sm">
-              <p className="text-xs text-gray-400 dark:text-gray-500 mb-1">최고 석차</p>
-              {bestRank != null ? (
-                <p className="text-2xl font-bold text-emerald-600 dark:text-emerald-400">{bestRank}등</p>
-              ) : (
-                <p className="text-2xl font-bold text-gray-300 dark:text-gray-600">-</p>
-              )}
-            </div>
-          </div>
-
-          {/* 성적 추이 꺾은선 */}
-          <div className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl p-5 shadow-sm">
-            <h2 className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-4">성적 추이</h2>
-            <ResponsiveContainer width="100%" height={240}>
-              <LineChart data={trendData} margin={{ top: 5, right: 30, left: 0, bottom: 5 }}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
-                <XAxis dataKey="name" tick={{ fontSize: 11, fill: "#9ca3af" }} />
-                <YAxis domain={[0, 100]} tickFormatter={(v) => `${v}%`} tick={{ fontSize: 11, fill: "#9ca3af" }} />
-                <Tooltip
-                  formatter={(value, name) => [`${value}%`, name === "pct" ? "내 점수" : "반 평균"]}
-                  labelFormatter={(_, payload) => payload?.[0]?.payload?.fullName ?? ""}
-                  contentStyle={{ fontSize: 12, borderRadius: 8 }}
-                />
-                <Legend formatter={(value) => value === "pct" ? "내 점수" : "반 평균"} wrapperStyle={{ fontSize: 12 }} />
-                <Line type="monotone" dataKey="pct" stroke="#f97316" strokeWidth={2.5} dot={{ r: 4, fill: "#f97316" }} activeDot={{ r: 6 }} />
-                <Line type="monotone" dataKey="classAvgPct" stroke="#6366f1" strokeWidth={2} strokeDasharray="5 5" dot={{ r: 3, fill: "#6366f1" }} />
-              </LineChart>
-            </ResponsiveContainer>
-          </div>
-
-          {/* 문항별 오답률 */}
-          {wrongData.length > 0 && (
-            <div className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl p-5 shadow-sm">
-              <h2 className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-4">문항별 오답률</h2>
-              <ResponsiveContainer width="100%" height={200}>
-                <BarChart data={wrongData} margin={{ top: 5, right: 10, left: 0, bottom: 5 }}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
-                  <XAxis dataKey="q" tick={{ fontSize: 10, fill: "#9ca3af" }} />
-                  <YAxis domain={[0, 100]} tickFormatter={(v) => `${v}%`} tick={{ fontSize: 11, fill: "#9ca3af" }} />
-                  <Tooltip
-                    formatter={(value, _, props) => [
-                      `${value}% (${props.payload.wrong}/${props.payload.total}회)`, "오답률"
-                    ]}
-                    contentStyle={{ fontSize: 12, borderRadius: 8 }}
-                  />
-                  <Bar dataKey="wrongRate" radius={[4, 4, 0, 0]}>
-                    {wrongData.map((d, i) => (
-                      <Cell key={i} fill={d.wrongRate >= 70 ? "#ef4444" : d.wrongRate >= 40 ? "#f97316" : "#22c55e"} />
-                    ))}
-                  </Bar>
-                </BarChart>
-              </ResponsiveContainer>
-              <div className="flex gap-4 mt-3 text-xs text-gray-400 justify-end">
-                <span className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded-sm bg-red-500 inline-block" />70% 이상</span>
-                <span className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded-sm bg-orange-500 inline-block" />40~69%</span>
-                <span className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded-sm bg-green-500 inline-block" />39% 이하</span>
-              </div>
-            </div>
+        {/* 학생 선택 + JPG 저장 */}
+        <div className="flex gap-3 items-center mb-6 flex-wrap">
+          <select value={selectedId} onChange={(e) => setSelectedId(e.target.value)} className={inputCls + " w-52"}>
+            <option value="">학생 선택...</option>
+            {students.map((s) => (
+              <option key={s.id} value={s.id}>{s.name} ({s.grade})</option>
+            ))}
+          </select>
+          {selected && graded.length > 0 && (
+            <>
+              <span className="text-sm text-gray-500 dark:text-gray-400">총 {graded.length}회 시험</span>
+              <button
+                onClick={async () => {
+                  const el = document.getElementById("individual-report");
+                  if (!el) return;
+                  const html2canvas = (await import("html2canvas")).default;
+                  const canvas = await html2canvas(el, { scale: 2, useCORS: true, backgroundColor: "#ffffff" });
+                  const link = document.createElement("a");
+                  link.download = `${selected.name}_수학성적분석.jpg`;
+                  link.href = canvas.toDataURL("image/jpeg", 0.92);
+                  link.click();
+                }}
+                className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors shadow-sm ml-auto"
+              >
+                JPG로 저장
+              </button>
+            </>
           )}
+        </div>
 
-          {/* 시험별 상세 테이블 */}
-          <div className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl overflow-hidden shadow-sm">
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm">
-                <thead className="bg-gray-50 dark:bg-gray-900/50 border-b border-gray-200 dark:border-gray-700">
-                  <tr>
-                    <th className="text-left px-4 py-3 font-medium text-gray-600 dark:text-gray-300">시험명</th>
-                    <th className="text-left px-4 py-3 font-medium text-gray-600 dark:text-gray-300">날짜</th>
-                    <th className="text-center px-4 py-3 font-medium text-gray-600 dark:text-gray-300">점수</th>
-                    <th className="text-center px-4 py-3 font-medium text-gray-600 dark:text-gray-300">정답률</th>
-                    <th className="text-center px-4 py-3 font-medium text-gray-600 dark:text-gray-300">반 평균</th>
-                    <th className="text-center px-4 py-3 font-medium text-gray-600 dark:text-gray-300">석차</th>
-                    <th className="text-left px-4 py-3 font-medium text-gray-600 dark:text-gray-300">오답 문항</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-gray-100 dark:divide-gray-700">
-                  {graded.map((s) => {
-                    const pct = Math.round((s.score / s.total) * 100);
-                    const classAvgPct = s.class_avg != null ? Math.round((s.class_avg / s.total) * 100) : null;
-                    const wrong = s.items?.filter((i) => !i.is_correct).map((i) => i.question_no).sort((a, b) => a - b) ?? [];
-                    return (
-                      <tr key={s.id} className="hover:bg-gray-50 dark:hover:bg-gray-700/30 transition-colors">
-                        <td className="px-4 py-3 font-medium text-gray-800 dark:text-gray-100">{s.test_title}</td>
-                        <td className="px-4 py-3 text-gray-500 dark:text-gray-400 text-xs">{s.test_date}</td>
-                        <td className="px-4 py-3 text-center font-bold text-orange-600 dark:text-orange-400">{s.score}/{s.total}</td>
-                        <td className="px-4 py-3 text-center">
-                          <span className={`text-sm font-bold ${pct >= 80 ? "text-green-600 dark:text-green-400" : pct >= 60 ? "text-orange-500 dark:text-orange-400" : "text-red-500 dark:text-red-400"}`}>
-                            {pct}%
-                          </span>
-                        </td>
-                        <td className="px-4 py-3 text-center text-sm text-indigo-500 dark:text-indigo-400">
-                          {s.class_avg != null ? (
-                            <span>
-                              {Math.round(s.class_avg)}%
-                              <span className={`text-xs ml-1 ${pct >= Math.round(s.class_avg) ? "text-green-500" : "text-red-400"}`}>
-                                ({pct >= Math.round(s.class_avg) ? "▲" : "▼"}{Math.abs(pct - Math.round(s.class_avg))}%p)
-                              </span>
-                            </span>
-                          ) : "-"}
-                        </td>
-                        <td className="px-4 py-3 text-center">
-                          {s.class_rank != null && s.class_total != null ? (
-                            <span className="font-bold text-gray-700 dark:text-gray-200">{s.class_rank}<span className="text-xs text-gray-400">/{s.class_total}</span></span>
-                          ) : "-"}
-                        </td>
-                        <td className="px-4 py-3">
-                          <div className="flex flex-wrap gap-1">
-                            {wrong.length === 0
-                              ? <span className="text-xs text-green-500">만점</span>
-                              : wrong.map((q) => (
-                                <span key={q} className="text-xs bg-red-50 dark:bg-red-900/30 text-red-500 dark:text-red-400 px-1.5 py-0.5 rounded">{q}번</span>
-                              ))}
-                          </div>
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
+        {!selectedId && (
+          <div className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl p-12 text-center text-gray-400 dark:text-gray-500 shadow-sm">
+            학생을 선택하면 성적 분석 리포트를 확인할 수 있습니다
+          </div>
+        )}
+        {selectedId && loading && <div className="text-center text-gray-400 py-12">불러오는 중...</div>}
+        {selectedId && !loading && graded.length === 0 && (
+          <div className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl p-12 text-center text-gray-400 dark:text-gray-500 shadow-sm">
+            채점 완료된 시험이 없습니다
+          </div>
+        )}
+
+        {selectedId && !loading && graded.length > 0 && (
+          /* ── 리포트 카드 (시험결과.html 스타일) ── */
+          <div id="individual-report" style={{ backgroundColor: "#fff", color: "#1a1a1a", fontFamily: "Noto Sans KR, Apple SD Gothic Neo, sans-serif" }}
+            className="border border-gray-200 rounded-xl shadow-lg overflow-hidden">
+            <div style={{ padding: "40px" }}>
+
+              {/* 헤더 */}
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-end", paddingBottom: "20px", borderBottom: "2px solid #e5e7eb" }}>
+                <div>
+                  <div style={{ fontSize: "18px", fontWeight: "bold", color: "#1f2937" }}>대치프라임 학원</div>
+                  <div style={{ fontSize: "12px", color: "#9ca3af", marginTop: "2px" }}>Daechi Prime Academy</div>
+                </div>
+                <div style={{ textAlign: "right" }}>
+                  <div style={{ fontSize: "22px", fontWeight: "bold", color: "#2563eb" }}>수학 성적 분석 리포트</div>
+                  <div style={{ fontSize: "13px", color: "#6b7280", marginTop: "4px" }}>
+                    {new Date().getFullYear()}년 / 발송일: {new Date().toLocaleDateString("ko-KR")}
+                  </div>
+                </div>
+              </div>
+
+              {/* 학생 정보 */}
+              <div style={{ margin: "24px 0", backgroundColor: "#f9fafb", borderRadius: "8px", padding: "16px", border: "1px solid #e5e7eb" }}>
+                <div style={{ display: "flex", gap: "48px" }}>
+                  <div><span style={{ fontWeight: "bold", color: "#4b5563", marginRight: "12px" }}>학생명</span><span style={{ fontWeight: "600" }}>{selected?.name}</span></div>
+                  <div><span style={{ fontWeight: "bold", color: "#4b5563", marginRight: "12px" }}>학년</span>{selected?.grade}</div>
+                  <div><span style={{ fontWeight: "bold", color: "#4b5563", marginRight: "12px" }}>총 응시 횟수</span>{graded.length}회</div>
+                  {bestRank != null && <div><span style={{ fontWeight: "bold", color: "#4b5563", marginRight: "12px" }}>최고 석차</span>{bestRank}등</div>}
+                </div>
+              </div>
+
+              {/* 성적 분석 — 차트 + 테이블 */}
+              <div style={{ marginTop: "28px" }}>
+                <div style={{ fontSize: "17px", fontWeight: "bold", color: "#1f2937", borderLeft: "4px solid #2563eb", paddingLeft: "12px", marginBottom: "20px" }}>
+                  성적 분석
+                </div>
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "24px", alignItems: "center" }}>
+                  {/* 레이더 차트 */}
+                  <div>
+                    <ResponsiveContainer width="100%" height={260}>
+                      <LineChart data={trendData} margin={{ top: 5, right: 20, left: 0, bottom: 5 }}>
+                        <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
+                        <XAxis dataKey="name" tick={{ fontSize: 10, fill: "#6b7280" }} />
+                        <YAxis domain={[0, 100]} tickFormatter={(v) => `${v}%`} tick={{ fontSize: 10, fill: "#6b7280" }} />
+                        <Tooltip
+                          formatter={(value, name) => [`${value}%`, name === "pct" ? "내 점수" : "반 평균"]}
+                          labelFormatter={(_, payload) => payload?.[0]?.payload?.fullName ?? ""}
+                          contentStyle={{ fontSize: 11, borderRadius: 6 }}
+                        />
+                        <Legend formatter={(v) => v === "pct" ? "내 점수" : "반 평균"} wrapperStyle={{ fontSize: 11 }} />
+                        <Line type="monotone" dataKey="pct" stroke="#3b82f6" strokeWidth={2.5} dot={{ r: 4, fill: "#3b82f6" }} activeDot={{ r: 6 }} />
+                        <Line type="monotone" dataKey="classAvgPct" stroke="#f97316" strokeWidth={2} strokeDasharray="5 5" dot={{ r: 3, fill: "#f97316" }} />
+                      </LineChart>
+                    </ResponsiveContainer>
+                  </div>
+
+                  {/* 성적 테이블 */}
+                  <div>
+                    <table style={{ width: "100%", textAlign: "center", borderCollapse: "collapse", fontSize: "13px" }}>
+                      <thead>
+                        <tr style={{ backgroundColor: "#f3f4f6", borderBottom: "2px solid #d1d5db" }}>
+                          {["시험명", "점수", "반 평균", "평균 대비", "석차"].map((h) => (
+                            <th key={h} style={{ padding: "10px 8px", fontWeight: "600", color: "#4b5563" }}>{h}</th>
+                          ))}
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {graded.map((s) => {
+                          const pct = Math.round((s.score / s.total) * 100);
+                          const avg = s.class_avg != null ? Math.round(s.class_avg) : null;
+                          const diff = avg != null ? pct - avg : null;
+                          return (
+                            <tr key={s.id} style={{ borderBottom: "1px solid #e5e7eb" }}>
+                              <td style={{ padding: "8px", color: "#374151", fontWeight: "500", textAlign: "left" }}>{s.test_title}</td>
+                              <td style={{ padding: "8px", fontWeight: "bold", color: "#2563eb" }}>{s.score}<span style={{ fontWeight: "normal", fontSize: "11px" }}>점</span></td>
+                              <td style={{ padding: "8px", color: "#6b7280" }}>{avg != null ? `${avg}%` : "-"}</td>
+                              <td style={{ padding: "8px", fontWeight: "500", color: diff != null ? (diff >= 0 ? "#16a34a" : "#dc2626") : "#6b7280" }}>
+                                {diff != null ? `${diff >= 0 ? "▲" : "▼"} ${Math.abs(diff)}` : "-"}
+                              </td>
+                              <td style={{ padding: "8px", color: "#374151" }}>
+                                {s.class_rank != null && s.class_total != null ? `${s.class_rank}/${s.class_total}` : "-"}
+                              </td>
+                            </tr>
+                          );
+                        })}
+                        {/* 평균 행 */}
+                        <tr style={{ backgroundColor: "#eff6ff", fontWeight: "bold", borderTop: "2px solid #bfdbfe" }}>
+                          <td style={{ padding: "10px 8px", textAlign: "left", color: "#1d4ed8" }}>전체 평균</td>
+                          <td style={{ padding: "10px 8px", color: "#1d4ed8" }}>{myAvg}%</td>
+                          <td style={{ padding: "10px 8px", color: "#1d4ed8" }}>{classAvgAvg != null ? `${classAvgAvg}%` : "-"}</td>
+                          <td style={{ padding: "10px 8px", color: myAvg != null && classAvgAvg != null ? (myAvg >= classAvgAvg ? "#16a34a" : "#dc2626") : "#6b7280" }}>
+                            {myAvg != null && classAvgAvg != null ? `${myAvg >= classAvgAvg ? "▲" : "▼"} ${Math.abs(myAvg - classAvgAvg)}` : "-"}
+                          </td>
+                          <td style={{ padding: "10px 8px", color: "#1d4ed8" }}>{bestRank != null ? `최고 ${bestRank}등` : "-"}</td>
+                        </tr>
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              </div>
+
+              {/* 문항별 오답 현황 */}
+              {wrongData.length > 0 && (
+                <div style={{ marginTop: "32px" }}>
+                  <div style={{ fontSize: "17px", fontWeight: "bold", color: "#1f2937", borderLeft: "4px solid #2563eb", paddingLeft: "12px", marginBottom: "20px" }}>
+                    문항별 오답 현황
+                  </div>
+                  <div style={{ backgroundColor: "#f9fafb", borderRadius: "8px", border: "1px solid #e5e7eb", padding: "16px" }}>
+                    <ResponsiveContainer width="100%" height={180}>
+                      <BarChart data={wrongData} margin={{ top: 4, right: 8, left: 0, bottom: 4 }}>
+                        <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
+                        <XAxis dataKey="q" tick={{ fontSize: 10, fill: "#6b7280" }} />
+                        <YAxis domain={[0, 100]} tickFormatter={(v) => `${v}%`} tick={{ fontSize: 10, fill: "#6b7280" }} />
+                        <Tooltip formatter={(value, _, props) => [`${value}% (${props.payload.wrong}/${props.payload.total}회)`, "오답률"]} contentStyle={{ fontSize: 11, borderRadius: 6 }} />
+                        <Bar dataKey="wrongRate" radius={[3, 3, 0, 0]}>
+                          {wrongData.map((d, i) => (
+                            <Cell key={i} fill={d.wrongRate >= 70 ? "#dc2626" : d.wrongRate >= 40 ? "#f97316" : "#4ade80"} />
+                          ))}
+                        </Bar>
+                      </BarChart>
+                    </ResponsiveContainer>
+                    {/* 취약 문항 목록 */}
+                    <div style={{ marginTop: "12px", display: "flex", flexWrap: "wrap", gap: "6px" }}>
+                      {wrongData.filter((d) => d.wrongRate >= 40).map((d) => (
+                        <span key={d.q} style={{ fontSize: "12px", backgroundColor: d.wrongRate >= 70 ? "#fee2e2" : "#ffedd5", color: d.wrongRate >= 70 ? "#dc2626" : "#c2410c", padding: "2px 10px", borderRadius: "999px", fontWeight: "500" }}>
+                          {d.q} ({d.wrongRate}%)
+                        </span>
+                      ))}
+                      {wrongData.filter((d) => d.wrongRate >= 40).length === 0 && (
+                        <span style={{ fontSize: "12px", color: "#16a34a" }}>전체 문항 오답률 40% 미만 — 양호</span>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              )}
+
             </div>
           </div>
-
-        </div>
-      )}
+        )}
       </div>
       )}
     </div>
