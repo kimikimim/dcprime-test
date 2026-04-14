@@ -118,6 +118,151 @@ export default function MathHistoryPage() {
     ? Math.min(...graded.filter((s) => s.class_rank != null).map((s) => s.class_rank!))
     : null;
 
+  // 개별 리포트 HTML 생성
+  const buildReportHtml = (s: MathSubmissionDetail, rank: number, total: number, avgPct: number | null) => {
+    const pct = Math.round((s.score / s.total) * 100);
+    const diff = avgPct != null ? pct - avgPct : null;
+    const wrong = s.items?.filter((i) => !i.is_correct).map((i) => i.question_no).sort((a, b) => a - b) ?? [];
+    const correct = s.items?.filter((i) => i.is_correct).map((i) => i.question_no).sort((a, b) => a - b) ?? [];
+    const today = new Date().toLocaleDateString("ko-KR");
+
+    const wrongRows = wrong.map((q) => `<span class="badge red">${q}번</span>`).join("") || `<span class="badge green">없음 (만점)</span>`;
+    const correctRows = correct.map((q) => `<span class="badge green">${q}번</span>`).join("") || "-";
+
+    // 문항별 정답/오답 막대
+    const barItems = (s.items ?? []).map((item) => `
+      <div class="bar-item">
+        <div class="bar-no">${item.question_no}</div>
+        <div class="bar-fill ${item.is_correct ? "correct" : "wrong"}"></div>
+        <div class="bar-label">${item.is_correct ? "○" : "✗"}</div>
+      </div>`).join("");
+
+    return `<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<title>${s.student_name} - ${s.test_title}</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: 'Apple SD Gothic Neo','Malgun Gothic',sans-serif; background:#f3f4f6; display:flex; justify-content:center; padding:32px 16px; }
+  .report { background:#fff; width:780px; border:1px solid #e2e8f0; border-radius:12px; padding:40px; box-shadow:0 4px 24px rgba(0,0,0,.08); }
+  .header { display:flex; justify-content:space-between; align-items:flex-end; padding-bottom:20px; border-bottom:2px solid #e5e7eb; }
+  .header-left h2 { font-size:18px; font-weight:700; color:#1f2937; }
+  .header-left p { font-size:12px; color:#9ca3af; margin-top:2px; }
+  .header-right h1 { font-size:22px; font-weight:700; color:#2563eb; }
+  .header-right p { font-size:12px; color:#6b7280; margin-top:4px; text-align:right; }
+  .info-box { margin:24px 0; background:#f9fafb; border-radius:8px; padding:16px; border:1px solid #e5e7eb; display:flex; gap:40px; flex-wrap:wrap; }
+  .info-item { font-size:14px; color:#374151; }
+  .info-item b { color:#4b5563; margin-right:8px; }
+  .section-title { font-size:16px; font-weight:700; color:#1f2937; border-left:4px solid #2563eb; padding-left:12px; margin:28px 0 16px; }
+  .score-grid { display:grid; grid-template-columns:repeat(4,1fr); gap:12px; }
+  .score-card { background:#f9fafb; border:1px solid #e5e7eb; border-radius:10px; padding:16px; text-align:center; }
+  .score-card .label { font-size:11px; color:#9ca3af; margin-bottom:6px; }
+  .score-card .value { font-size:26px; font-weight:700; }
+  .blue { color:#2563eb; } .orange { color:#f97316; } .green { color:#16a34a; } .red { color:#dc2626; }
+  .bar-wrap { display:flex; gap:6px; flex-wrap:wrap; margin-top:8px; }
+  .bar-item { display:flex; flex-direction:column; align-items:center; gap:2px; }
+  .bar-no { font-size:10px; color:#6b7280; }
+  .bar-fill { width:20px; height:40px; border-radius:4px; }
+  .bar-fill.correct { background:#4ade80; }
+  .bar-fill.wrong { background:#f87171; }
+  .bar-label { font-size:11px; font-weight:700; }
+  .badge { display:inline-block; padding:2px 8px; border-radius:999px; font-size:12px; font-weight:500; margin:2px; }
+  .badge.red { background:#fee2e2; color:#dc2626; }
+  .badge.green { background:#dcfce7; color:#16a34a; }
+  .diff { font-size:13px; font-weight:600; }
+  .print-btn { display:block; margin:24px auto 0; padding:10px 28px; background:#2563eb; color:#fff; border:none; border-radius:8px; font-size:14px; font-weight:600; cursor:pointer; }
+  @media print { .print-btn { display:none; } body { background:#fff; padding:0; } .report { box-shadow:none; border:none; } }
+</style>
+</head>
+<body>
+<div class="report">
+  <div class="header">
+    <div class="header-left">
+      <h2>대치프라임 학원</h2>
+      <p>Daechi Prime Academy</p>
+    </div>
+    <div class="header-right">
+      <h1>수학 성적 분석 리포트</h1>
+      <p>발송일: ${today}</p>
+    </div>
+  </div>
+
+  <div class="info-box">
+    <div class="info-item"><b>학생명</b>${s.student_name}</div>
+    <div class="info-item"><b>시험명</b>${s.test_title}</div>
+    <div class="info-item"><b>시험일</b>${s.test_date}</div>
+  </div>
+
+  <div class="section-title">성적 분석</div>
+  <div class="score-grid">
+    <div class="score-card"><div class="label">점수</div><div class="value blue">${s.score}<span style="font-size:14px;font-weight:400">/${s.total}</span></div></div>
+    <div class="score-card"><div class="label">정답률</div><div class="value ${pct >= 80 ? "green" : pct >= 60 ? "orange" : "red"}">${pct}%</div></div>
+    <div class="score-card"><div class="label">반 평균</div><div class="value orange">${avgPct != null ? avgPct + "%" : "-"}</div></div>
+    <div class="score-card"><div class="label">석차</div><div class="value blue">${rank}<span style="font-size:14px;font-weight:400">/${total}등</span></div></div>
+  </div>
+  ${diff != null ? `<p style="margin-top:12px;font-size:13px;color:${diff >= 0 ? "#16a34a" : "#dc2626"};font-weight:600;">반 평균 대비: ${diff >= 0 ? "▲" : "▼"} ${Math.abs(diff)}%p</p>` : ""}
+
+  <div class="section-title">문항별 결과</div>
+  <div class="bar-wrap">${barItems}</div>
+  <div style="margin-top:16px;">
+    <p style="font-size:13px;color:#374151;margin-bottom:6px;"><b>오답 문항</b></p>
+    <div>${wrongRows}</div>
+  </div>
+
+  <button class="print-btn" onclick="window.print()">인쇄 / PDF 저장</button>
+</div>
+</body>
+</html>`;
+  };
+
+  const openReport = (s: MathSubmissionDetail, rank: number) => {
+    const html = buildReportHtml(s, rank, classGraded.length, classAvgPct);
+    const win = window.open("", "_blank");
+    if (!win) return;
+    win.document.write(html);
+    win.document.close();
+  };
+
+  const downloadAllJpg = async () => {
+    if (classGraded.length === 0) return;
+    const JSZip = (await import("jszip")).default;
+    const html2canvas = (await import("html2canvas")).default;
+    const zip = new JSZip();
+    const btn = document.getElementById("bulk-jpg-btn");
+    if (btn) btn.textContent = "생성 중...";
+
+    // 숨김 iframe으로 각 리포트 렌더링 후 캡처
+    const iframe = document.createElement("iframe");
+    iframe.style.cssText = "position:fixed;left:-9999px;top:0;width:820px;height:1200px;border:none;";
+    document.body.appendChild(iframe);
+
+    for (let i = 0; i < classSorted.length; i++) {
+      const s = classSorted[i];
+      const rank = i + 1;
+      if (btn) btn.textContent = `생성 중... (${rank}/${classSorted.length}) ${s.student_name}`;
+      const html = buildReportHtml(s, rank, classGraded.length, classAvgPct);
+      const doc = iframe.contentDocument!;
+      doc.open(); doc.write(html); doc.close();
+      await new Promise((r) => setTimeout(r, 700));
+      const reportEl = doc.querySelector(".report") as HTMLElement;
+      if (reportEl) {
+        const canvas = await html2canvas(reportEl, { scale: 2, useCORS: true, backgroundColor: "#fff" });
+        const blob = await new Promise<Blob>((r) => canvas.toBlob((b) => r(b!), "image/jpeg", 0.92));
+        zip.file(`${String(rank).padStart(2, "0")}_${s.student_name}_리포트.jpg`, blob);
+      }
+    }
+    document.body.removeChild(iframe);
+    if (btn) btn.textContent = "ZIP 압축 중...";
+    const zipBlob = await zip.generateAsync({ type: "blob" });
+    const link = document.createElement("a");
+    link.href = URL.createObjectURL(zipBlob);
+    const testTitle = mathTests.find((t) => String(t.id) === classTestId)?.title ?? "리포트";
+    link.download = `${testTitle}_전원리포트.zip`;
+    link.click();
+    if (btn) btn.textContent = "전원 JPG 저장 (ZIP)";
+  };
+
   // 반별 뷰 계산
   const classGraded = classSubmissions;
   const classAvgPct = classGraded.length > 0
@@ -160,7 +305,7 @@ export default function MathHistoryPage() {
       {/* ───── 반별/시험별 탭 ───── */}
       {tab === "class" && (
         <div>
-          <div className="flex gap-3 items-center mb-6">
+          <div className="flex gap-3 items-center mb-6 flex-wrap">
             <select value={classTestId} onChange={(e) => setClassTestId(e.target.value)} className={inputCls + " w-72"}>
               <option value="">시험 선택...</option>
               {mathTests.map((t) => (
@@ -168,7 +313,16 @@ export default function MathHistoryPage() {
               ))}
             </select>
             {classGraded.length > 0 && (
-              <span className="text-sm text-gray-500 dark:text-gray-400">응시 {classGraded.length}명</span>
+              <>
+                <span className="text-sm text-gray-500 dark:text-gray-400">응시 {classGraded.length}명</span>
+                <button
+                  id="bulk-jpg-btn"
+                  onClick={downloadAllJpg}
+                  className="ml-auto bg-orange-600 hover:bg-orange-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors shadow-sm"
+                >
+                  전원 JPG 저장 (ZIP)
+                </button>
+              </>
             )}
           </div>
 
@@ -221,7 +375,7 @@ export default function MathHistoryPage() {
                   <table className="w-full text-sm">
                     <thead className="bg-gray-50 dark:bg-gray-900/50 border-b border-gray-200 dark:border-gray-700">
                       <tr>
-                        {["석차", "이름", "점수", "정답률", "반 평균 대비", "오답 문항"].map((h) => (
+                        {["석차", "이름", "점수", "정답률", "반 평균 대비", "오답 문항", ""].map((h) => (
                           <th key={h} className="text-left px-4 py-3 font-semibold text-xs text-gray-500 dark:text-gray-400 uppercase tracking-wide whitespace-nowrap">{h}</th>
                         ))}
                       </tr>
@@ -253,6 +407,29 @@ export default function MathHistoryPage() {
                                   : wrong.map((q) => (
                                     <span key={q} className="text-xs bg-red-50 dark:bg-red-900/30 text-red-500 dark:text-red-400 px-1.5 py-0.5 rounded">{q}번</span>
                                   ))}
+                              </div>
+                            </td>
+                            <td className="px-4 py-3">
+                              <div className="flex gap-1">
+                                <button
+                                  onClick={() => openReport(s, idx + 1)}
+                                  className="text-xs bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 hover:bg-blue-100 dark:hover:bg-blue-900/50 px-2 py-1 rounded font-medium transition-colors"
+                                >
+                                  리포트
+                                </button>
+                                <button
+                                  onClick={() => {
+                                    const html = buildReportHtml(s, idx + 1, classGraded.length, classAvgPct);
+                                    const win = window.open("", "_blank");
+                                    if (!win) return;
+                                    win.document.write(html);
+                                    win.document.close();
+                                    setTimeout(() => win.print(), 600);
+                                  }}
+                                  className="text-xs bg-gray-50 dark:bg-gray-700 text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-600 px-2 py-1 rounded font-medium transition-colors"
+                                >
+                                  인쇄
+                                </button>
                               </div>
                             </td>
                           </tr>
