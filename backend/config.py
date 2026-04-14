@@ -10,9 +10,6 @@ from dotenv import load_dotenv
 # 프로젝트 루트의 .env 파일 로드 (없어도 에러 없음)
 load_dotenv()
 
-# ── API 인증 ───────────────────────────────────────────────────
-API_SECRET: str = os.environ.get("API_SECRET", "")
-
 # ── 파일 업로드 크기 제한 ───────────────────────────────────────
 MAX_UPLOAD_PDF:   int = 200 * 1024 * 1024   # 200MB (합본 PDF)
 MAX_UPLOAD_IMAGE: int =  20 * 1024 * 1024   # 20MB  (이미지)

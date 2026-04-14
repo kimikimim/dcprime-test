@@ -1,13 +1,12 @@
 const BASE = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
-const API_SECRET = process.env.NEXT_PUBLIC_API_SECRET ?? "";
 
 export function apiHeaders(extra?: Record<string, string>): Record<string, string> {
-  return { "X-API-Secret": API_SECRET, ...extra };
+  return { ...extra };
 }
 
 export async function apiFetch<T>(path: string, options?: RequestInit): Promise<T> {
   const res = await fetch(`${BASE}/api${path}`, {
-    headers: { "Content-Type": "application/json", "X-API-Secret": API_SECRET },
+    headers: { "Content-Type": "application/json" },
     ...options,
   });
   if (!res.ok) {

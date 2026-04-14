@@ -1,13 +1,12 @@
 import os
 from contextlib import asynccontextmanager
 import logger as _logger_init  # 앱 시작 시 로깅 설정 적용
-from fastapi import FastAPI, Request
+from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from slowapi import _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
 from limiter import limiter
-from config import API_SECRET
 from routers import students, tests, results, classes, analytics
 from routers import (
     word_tests,
@@ -78,10 +77,6 @@ app = FastAPI(
 app.state.limiter = limiter
 app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 
-@app.middleware("http")
-async def verify_api_secret(request: Request, call_next):
-    return await call_next(request)
-
 _raw_origins = os.getenv("ALLOWED_ORIGINS", "*")
 _allowed_origins = [o.strip() for o in _raw_origins.split(",") if o.strip()]
 
@@ -89,7 +84,7 @@ app.add_middleware(
     CORSMiddleware,
     allow_origins=_allowed_origins,
     allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
-    allow_headers=["Content-Type", "Authorization", "X-API-Secret"],
+    allow_headers=["Content-Type", "Authorization"],
 )
 
 app.include_router(students.router, prefix="/api")
