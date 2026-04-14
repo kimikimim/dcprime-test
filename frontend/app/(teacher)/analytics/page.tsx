@@ -1,5 +1,6 @@
 "use client";
 import { useEffect, useState } from "react";
+import JSZip from "jszip";
 import { apiFetch, apiHeaders, Test, AnalyticsData, QuestionStat, Student, Class } from "@/lib/api";
 import {
   BarChart, Bar, XAxis, YAxis, Tooltip, Legend, ResponsiveContainer, Cell,
@@ -38,6 +39,10 @@ export default function AnalyticsPage() {
   const [weakLoading, setWeakLoading] = useState(false);
   const [generating, setGenerating] = useState(false);
 
+  const [bulkTestId, setBulkTestId] = useState("");
+  const [bulkLoading, setBulkLoading] = useState(false);
+  const [bulkProgress, setBulkProgress] = useState("");
+
   const [aiTestId, setAiTestId] = useState("");
   const [aiLoading, setAiLoading] = useState(false);
   const [aiAssignments, setAiAssignments] = useState<AiAssignment[] | null>(null);
@@ -63,6 +68,50 @@ export default function AnalyticsPage() {
       const data = await apiFetch<WeaknessResult>(`/analytics/weakness/${weakStudentId}/${weakTestId}`);
       setWeakness(data);
     } catch { /* handle */ } finally { setWeakLoading(false); }
+  };
+
+  const downloadBulkZip = async () => {
+    if (!bulkTestId) return;
+    setBulkLoading(true);
+    setBulkProgress("학생 목록 불러오는 중...");
+    try {
+      // 해당 테스트에 응시한 학생 목록 가져오기
+      const results = await apiFetch<{ student_id: number; student_name: string }[]>(`/results?test_id=${bulkTestId}`);
+      const testTitle = tests.find((t) => String(t.id) === bulkTestId)?.title ?? "리포트";
+
+      const zip = new JSZip();
+      for (let i = 0; i < results.length; i++) {
+        const { student_id, student_name } = results[i];
+        setBulkProgress(`분석 중... (${i + 1}/${results.length}) ${student_name}`);
+        try {
+          const weakness = await apiFetch<WeaknessResult>(`/analytics/weakness/${student_id}/${bulkTestId}`);
+          const lines = [
+            `=== ${student_name} — ${testTitle} ===`,
+            `점수: ${weakness.score} / ${weakness.total}`,
+            `응시일: ${new Date().toLocaleDateString("ko-KR")}`,
+            "",
+            "[ 유형별 분석 ]",
+            ...weakness.tags.map(
+              (t) => `  ${t.tag}: ${t.wrong}/${t.total}개 틀림 (오답률 ${t.wrong_rate}%) — 틀린 문항: ${t.wrong_questions.join(", ")}번`
+            ),
+            weakness.tags.length === 0 ? "  (태그 데이터 없음 — 테스트 관리에서 태그 설정 필요)" : "",
+          ].join("\n");
+          zip.file(`${String(i + 1).padStart(2, "0")}_${student_name}_분석.txt`, lines);
+        } catch {
+          zip.file(`${String(i + 1).padStart(2, "0")}_${student_name}_분석.txt`, `${student_name} — 데이터 없음`);
+        }
+      }
+
+      setBulkProgress("ZIP 압축 중...");
+      const blob = await zip.generateAsync({ type: "blob" });
+      const link = document.createElement("a");
+      link.href = URL.createObjectURL(blob);
+      link.download = `${testTitle}_전체분석.zip`;
+      link.click();
+    } finally {
+      setBulkLoading(false);
+      setBulkProgress("");
+    }
   };
 
   const runAiAssign = async () => {
@@ -329,6 +378,27 @@ export default function AnalyticsPage() {
             <span className="ml-3 text-xs text-gray-400 dark:text-gray-500">확정 시 학생 DB에 반이 저장됩니다</span>
           </div>
         )}
+      </div>
+
+      {/* 전체 학생 분석 ZIP 다운로드 */}
+      <div className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl p-5 shadow-sm mb-6">
+        <h2 className="font-semibold mb-4 text-gray-800 dark:text-gray-100">전체 학생 분석 ZIP 다운로드</h2>
+        <div className="flex gap-3 items-end flex-wrap">
+          <div>
+            <label className="block text-xs text-gray-500 dark:text-gray-400 mb-1.5">테스트 선택</label>
+            <select value={bulkTestId} onChange={(e) => setBulkTestId(e.target.value)} className={selectCls + " w-72"}>
+              <option value="">-- 테스트를 선택하세요 --</option>
+              {tests.map((t) => <option key={t.id} value={t.id}>{t.title}</option>)}
+            </select>
+          </div>
+          <button onClick={downloadBulkZip} disabled={!bulkTestId || bulkLoading}
+            className="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors disabled:opacity-40 shadow-sm">
+            {bulkLoading ? bulkProgress || "처리 중..." : "전체 분석 ZIP 다운로드"}
+          </button>
+        </div>
+        <p className="text-xs text-gray-400 dark:text-gray-500 mt-2">
+          해당 테스트에 응시한 전체 학생의 유형별 분석 결과를 ZIP으로 묶어 다운로드합니다. 태그가 설정된 테스트에서만 유형 분석이 제공됩니다.
+        </p>
       </div>
 
       {/* 학생별 취약 유형 분석 */}

@@ -14,7 +14,8 @@ export default function TestsPage() {
     question_count: 20, test_date: new Date().toISOString().split("T")[0],
   });
   const [answers, setAnswers] = useState<Record<string, string>>({});
-  const [step, setStep] = useState<"info" | "answers">("info");
+  const [step, setStep] = useState<"info" | "answers" | "tags">("info");
+  const [createdTestId, setCreatedTestId] = useState<number | null>(null);
   const [error, setError] = useState("");
   const [extracting, setExtracting] = useState(false);
   const [extractMsg, setExtractMsg] = useState("");
@@ -75,16 +76,38 @@ export default function TestsPage() {
       return;
     }
     try {
-      await apiFetch("/tests", {
+      const created = await apiFetch<{ id: number }>("/tests", {
         method: "POST",
         body: JSON.stringify({ ...form, answers }),
       });
-      setStep("info");
-      setForm({ title: "", grade: "중1", subject: "수학", question_count: 20, test_date: new Date().toISOString().split("T")[0] });
+      // 태그 입력 단계로 이동
+      const init: Record<string, string> = {};
+      for (let i = 1; i <= form.question_count; i++) init[String(i)] = "";
+      setTags(init);
+      setCreatedTestId(created.id);
+      setStep("tags");
       load();
     } catch (e: unknown) {
       setError(e instanceof Error ? e.message : "오류가 발생했습니다");
     }
+  };
+
+  const submitTags = async (skip = false) => {
+    if (!skip && createdTestId) {
+      setTagSaving(true);
+      const BASE = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
+      await fetch(`${BASE}/api/tests/${createdTestId}/tags`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(tags),
+      });
+      setTagSaving(false);
+    }
+    setStep("info");
+    setCreatedTestId(null);
+    setForm({ title: "", grade: "중1", subject: "수학", question_count: 20, test_date: new Date().toISOString().split("T")[0] });
+    setTags({});
+    load();
   };
 
   const startEditTest = (t: Test) => {
@@ -143,7 +166,38 @@ export default function TestsPage() {
     <div>
       <h1 className="text-xl font-bold mb-6 text-gray-900 dark:text-gray-100">테스트 관리</h1>
 
-      {step === "info" ? (
+      {step === "tags" ? (
+        <div className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl p-5 mb-6 shadow-sm">
+          <div className="flex justify-between items-center mb-4 flex-wrap gap-2">
+            <div>
+              <h2 className="font-semibold text-gray-800 dark:text-gray-100">3단계: 문항별 개념/유형 태그 — {form.title}</h2>
+              <p className="text-xs text-gray-400 dark:text-gray-500 mt-1">각 문항이 어떤 개념/유형에 해당하는지 입력하세요. 나중에 취약 유형 분석에 사용됩니다.</p>
+            </div>
+            <div className="flex gap-2">
+              <button onClick={() => submitTags(true)} className="text-sm text-gray-500 dark:text-gray-400 hover:underline px-3 py-1.5">
+                태그 건너뛰기
+              </button>
+              <button onClick={() => submitTags(false)} disabled={tagSaving}
+                className="bg-indigo-600 hover:bg-indigo-700 text-white px-5 py-2 rounded-lg text-sm font-medium transition-colors disabled:opacity-50 shadow-sm">
+                {tagSaving ? "저장 중..." : "태그 저장 후 완료"}
+              </button>
+            </div>
+          </div>
+          <div className="grid grid-cols-3 sm:grid-cols-5 lg:grid-cols-7 gap-2">
+            {Object.keys(tags).map((no) => (
+              <div key={no} className="flex flex-col gap-1">
+                <span className="text-xs text-gray-500 dark:text-gray-400 text-center">{no}번</span>
+                <input
+                  value={tags[no]}
+                  onChange={(e) => setTags({ ...tags, [no]: e.target.value })}
+                  className="border border-gray-200 dark:border-gray-600 rounded-lg px-2 py-1.5 text-xs w-full text-center bg-white dark:bg-gray-700 dark:text-gray-100 focus:outline-none focus:ring-1 focus:ring-purple-500"
+                  placeholder="예) 삼각비"
+                />
+              </div>
+            ))}
+          </div>
+        </div>
+      ) : step === "info" ? (
         <form onSubmit={handleInfoNext} className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl p-5 mb-6 flex flex-wrap gap-3 items-end shadow-sm">
           <div>
             <label className="block text-xs text-gray-500 dark:text-gray-400 mb-1.5">테스트명 *</label>
@@ -210,7 +264,7 @@ export default function TestsPage() {
           </div>
           {error && <p className="text-red-500 dark:text-red-400 text-sm mb-2">{error}</p>}
           <button onClick={submit} className="bg-indigo-600 hover:bg-indigo-700 text-white px-5 py-2 rounded-lg text-sm font-medium transition-colors shadow-sm">
-            테스트 저장
+            다음: 태그 입력 →
           </button>
         </div>
       )}
