@@ -7,6 +7,7 @@ from pydantic import BaseModel
 from typing import Optional
 from database import get_db
 import models
+from models import MathSubmission
 
 router = APIRouter(prefix="/students", tags=["students"])
 
@@ -183,6 +184,39 @@ def get_student_profile(student_id: int, db: Session = Depends(get_db)):
 
     class_ = db.get(models.Class, student.class_id) if student.class_id else None
 
+    # 수학 성적
+    math_subs = db.query(MathSubmission).filter(
+        MathSubmission.student_id == student_id,
+        MathSubmission.status == "graded",
+        MathSubmission.total.isnot(None),
+    ).order_by(MathSubmission.submitted_at.desc()).all()
+
+    math_list = []
+    for ms in math_subs:
+        # 반 평균/석차 계산
+        all_subs = db.query(MathSubmission).filter(
+            MathSubmission.math_test_id == ms.math_test_id,
+            MathSubmission.status == "graded",
+            MathSubmission.score.isnot(None),
+            MathSubmission.total.isnot(None),
+        ).all()
+        scores = [(s.student_id, round(s.score / s.total * 100, 1)) for s in all_subs if s.total]
+        avg = round(sum(p for _, p in scores) / len(scores), 1) if scores else None
+        my_pct = round(ms.score / ms.total * 100, 1) if ms.total else None
+        rank = sum(1 for _, p in scores if p > my_pct) + 1 if my_pct is not None and scores else None
+
+        math_list.append({
+            "id": ms.id,
+            "test_title": ms.math_test.title if ms.math_test else "",
+            "test_date": str(ms.math_test.test_date) if ms.math_test else None,
+            "score": ms.score,
+            "total": ms.total,
+            "score_pct": my_pct,
+            "class_avg": avg,
+            "class_rank": rank,
+            "class_total": len(scores),
+        })
+
     return {
         "id":                    student.id,
         "name":                  student.name,
@@ -196,6 +230,7 @@ def get_student_profile(student_id: int, db: Session = Depends(get_db)):
         "test_results":          test_result_list,
         "historical":            historical_list,
         "tutoring_sessions":     tutoring_list,
+        "math_results":          math_list,
     }
 
 

@@ -20,14 +20,15 @@ interface MathSubmissionDetail {
   total: number;
   status: string;
   student_name: string;
-  class_avg: number | null;   // 반 평균 % (0~100)
-  class_rank: number | null;  // 반 석차
-  class_total: number | null; // 반 응시 인원
+  class_avg: number | null;
+  class_rank: number | null;
+  class_total: number | null;
   items?: {
     question_no: number;
     student_answer: number | null;
     correct_answer: number;
     is_correct: boolean;
+    tag: string | null;
   }[];
 }
 
@@ -129,6 +130,17 @@ export default function MathHistoryPage() {
     const wrongRows = wrong.map((q) => `<span class="badge red">${q}번</span>`).join("") || `<span class="badge green">없음 (만점)</span>`;
     const correctRows = correct.map((q) => `<span class="badge green">${q}번</span>`).join("") || "-";
 
+    // 취약 유형 태그 집계 (오답 문항의 태그)
+    const weakTagMap: Record<string, number[]> = {};
+    (s.items ?? []).filter(i => !i.is_correct && i.tag).forEach(i => {
+      const t = i.tag!;
+      if (!weakTagMap[t]) weakTagMap[t] = [];
+      weakTagMap[t].push(i.question_no);
+    });
+    const weakTagHtml = Object.entries(weakTagMap).map(([tag, qnos]) =>
+      `<span class="badge red">${tag} (${qnos.map(q => q + "번").join(", ")})</span>`
+    ).join("") || "";
+
     // 문항별 정답/오답 막대
     const barItems = (s.items ?? []).map((item) => `
       <div class="bar-item">
@@ -209,6 +221,11 @@ export default function MathHistoryPage() {
     <p style="font-size:13px;color:#374151;margin-bottom:6px;"><b>오답 문항</b></p>
     <div>${wrongRows}</div>
   </div>
+  ${weakTagHtml ? `
+  <div style="margin-top:16px;">
+    <p style="font-size:13px;color:#374151;margin-bottom:6px;"><b>취약 유형</b></p>
+    <div>${weakTagHtml}</div>
+  </div>` : ""}
 
   <button class="print-btn" onclick="window.print()">인쇄 / PDF 저장</button>
 </div>

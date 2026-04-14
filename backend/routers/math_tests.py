@@ -27,6 +27,10 @@ class AnswersIn(BaseModel):
     answers: List[int]
 
 
+class TagsIn(BaseModel):
+    tags: dict  # {"1": "함수", "2": "인수분해", ...}
+
+
 class MathTestOut(BaseModel):
     id: int
     title: str
@@ -34,6 +38,7 @@ class MathTestOut(BaseModel):
     test_date: date
     num_questions: int
     has_answers: bool
+    tags: dict = {}
     class Config:
         from_attributes = True
 
@@ -51,7 +56,8 @@ def list_math_tests(db: Session = Depends(get_db)):
     tests = db.query(MathTest).order_by(MathTest.test_date.desc()).all()
     return [MathTestOut(
         id=t.id, title=t.title, grade=t.grade, test_date=t.test_date,
-        num_questions=t.num_questions, has_answers=_has_answers(t.answers or [])
+        num_questions=t.num_questions, has_answers=_has_answers(t.answers or []),
+        tags=t.tags or {}
     ) for t in tests]
 
 
@@ -67,7 +73,7 @@ def create_math_test(body: MathTestIn, db: Session = Depends(get_db)):
     db.refresh(test)
     return MathTestOut(
         id=test.id, title=test.title, grade=test.grade, test_date=test.test_date,
-        num_questions=test.num_questions, has_answers=False
+        num_questions=test.num_questions, has_answers=False, tags={}
     )
 
 
@@ -92,7 +98,8 @@ def update_math_test(test_id: int, body: MathTestUpdate, db: Session = Depends(g
     db.refresh(test)
     return MathTestOut(
         id=test.id, title=test.title, grade=test.grade, test_date=test.test_date,
-        num_questions=test.num_questions, has_answers=_has_answers(test.answers or [])
+        num_questions=test.num_questions, has_answers=_has_answers(test.answers or []),
+        tags=test.tags or {}
     )
 
 
@@ -114,6 +121,24 @@ def update_answers(test_id: int, body: AnswersIn, db: Session = Depends(get_db))
         raise HTTPException(404, "Not found")
     test.answers = body.answers
     test.num_questions = len(body.answers)
+    db.commit()
+    return {"ok": True}
+
+
+@router.get("/{test_id}/tags")
+def get_tags(test_id: int, db: Session = Depends(get_db)):
+    test = db.query(MathTest).filter(MathTest.id == test_id).first()
+    if not test:
+        raise HTTPException(404, "Not found")
+    return {"tags": test.tags or {}}
+
+
+@router.put("/{test_id}/tags")
+def update_tags(test_id: int, body: TagsIn, db: Session = Depends(get_db)):
+    test = db.query(MathTest).filter(MathTest.id == test_id).first()
+    if not test:
+        raise HTTPException(404, "Not found")
+    test.tags = body.tags
     db.commit()
     return {"ok": True}
 

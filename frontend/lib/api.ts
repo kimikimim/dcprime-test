@@ -40,6 +40,11 @@ export interface StudentProfile {
     attempt3_total: number | null; attempt3_wrong: number | null;
     memo: string | null;
   }[];
+  math_results: {
+    id: number; test_title: string; test_date: string | null;
+    score: number | null; total: number | null; score_pct: number | null;
+    class_avg: number | null; class_rank: number | null; class_total: number;
+  }[];
 }
 export interface Test {
   id: number; title: string; grade: string; subject: string;

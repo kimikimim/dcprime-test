@@ -39,6 +39,14 @@ MIGRATIONS = [
         """,
         "sql": "ALTER TABLE word_tests ADD COLUMN ambiguous_threshold FLOAT NOT NULL DEFAULT 0.65",
     },
+    {
+        "name": "add_tags_to_math_tests",
+        "check": """
+            SELECT column_name FROM information_schema.columns
+            WHERE table_name = 'math_tests' AND column_name = 'tags'
+        """,
+        "sql": "ALTER TABLE math_tests ADD COLUMN tags JSONB DEFAULT '{}'",
+    },
 ]
 
 def run():

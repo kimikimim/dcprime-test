@@ -22,6 +22,7 @@ class SubmissionItemOut(BaseModel):
     student_answer: Optional[int]
     correct_answer: int
     is_correct: bool
+    tag: Optional[str] = None
     class Config:
         from_attributes = True
 
@@ -112,6 +113,7 @@ def list_submissions(
                     "student_answer": i.student_answer,
                     "correct_answer": i.correct_answer,
                     "is_correct": i.is_correct,
+                    "tag": (s.math_test.tags or {}).get(str(i.question_no)) if s.math_test else None,
                 }
                 for i in s.items
             ]
@@ -224,6 +226,7 @@ def get_submission(sub_id: int, db: Session = Depends(get_db)):
     class_avg, class_rank, class_total = None, None, None
     if s.student_id and s.math_test_id and s.status == "graded":
         class_avg, class_rank, class_total = _calc_class_stats(db, s.math_test_id, s.student_id)
+    tags_map = s.math_test.tags or {} if s.math_test else {}
     return MathSubmissionDetailOut(
         **_build_out(s, class_avg, class_rank, class_total),
         items=[SubmissionItemOut(
@@ -231,6 +234,7 @@ def get_submission(sub_id: int, db: Session = Depends(get_db)):
             student_answer=i.student_answer,
             correct_answer=i.correct_answer,
             is_correct=i.is_correct,
+            tag=tags_map.get(str(i.question_no)),
         ) for i in s.items]
     )
 

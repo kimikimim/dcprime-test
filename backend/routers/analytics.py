@@ -367,6 +367,50 @@ def ai_recommend_assign(test_id: int, db: Session = Depends(get_db)):
     return {"test_id": test_id, "assignments": enriched}
 
 
+@router.get("/math/questions/{test_id}")
+def math_question_stats(test_id: int, db: Session = Depends(get_db)):
+    """수학 시험 문항별 오답률 분석"""
+    test = db.get(models.MathTest, test_id)
+    if not test:
+        raise HTTPException(404, "시험을 찾을 수 없습니다")
+
+    subs = db.query(models.MathSubmission).filter(
+        models.MathSubmission.math_test_id == test_id,
+        models.MathSubmission.status == "graded",
+    ).all()
+
+    if not subs:
+        return {"test_id": test_id, "test_title": test.title, "total_students": 0, "questions": []}
+
+    tags_map = test.tags or {}
+    stats: dict[int, dict] = {}
+    for s in subs:
+        for item in s.items:
+            q = item.question_no
+            if q not in stats:
+                stats[q] = {"question_no": q, "correct": 0, "incorrect": 0, "tag": tags_map.get(str(q))}
+            if item.is_correct:
+                stats[q]["correct"] += 1
+            else:
+                stats[q]["incorrect"] += 1
+
+    questions = sorted(stats.values(), key=lambda x: x["question_no"])
+    for q in questions:
+        total = q["correct"] + q["incorrect"]
+        q["correct_rate"] = round(q["correct"] / total * 100, 1) if total else 0
+        q["incorrect_rate"] = round(q["incorrect"] / total * 100, 1) if total else 0
+
+    avg_scores = [round(s.score / s.total * 100, 1) for s in subs if s.total and s.total > 0]
+    return {
+        "test_id": test_id,
+        "test_title": test.title,
+        "grade": test.grade,
+        "total_students": len(subs),
+        "avg_score": round(sum(avg_scores) / len(avg_scores), 1) if avg_scores else None,
+        "questions": questions,
+    }
+
+
 @router.post("/assign/{test_id}/confirm")
 def confirm_assign(test_id: int, overrides: dict[int, int], db: Session = Depends(get_db)):
     """

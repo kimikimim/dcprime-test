@@ -25,7 +25,13 @@ interface AiAssignment {
   reason: string;
 }
 
+interface MathTest { id: number; title: string; grade: string; test_date: string; }
+interface MathQuestionStat { question_no: number; correct: number; incorrect: number; correct_rate: number; incorrect_rate: number; tag: string | null; }
+interface MathAnalyticsData { test_id: number; test_title: string; grade: string; total_students: number; avg_score: number | null; questions: MathQuestionStat[]; }
+
 export default function AnalyticsPage() {
+  const [tab, setTab] = useState<"admission" | "math">("admission");
+
   const [tests, setTests] = useState<Test[]>([]);
   const [testId, setTestId] = useState("");
   const [data, setData] = useState<AnalyticsData | null>(null);
@@ -49,11 +55,28 @@ export default function AnalyticsPage() {
   const [aiOverrides, setAiOverrides] = useState<Record<number, number>>({});
   const [confirming, setConfirming] = useState(false);
 
+  // 수학 탭
+  const [mathTests, setMathTests] = useState<MathTest[]>([]);
+  const [mathTestId, setMathTestId] = useState("");
+  const [mathData, setMathData] = useState<MathAnalyticsData | null>(null);
+  const [mathLoading, setMathLoading] = useState(false);
+
   useEffect(() => {
     apiFetch<Test[]>("/tests").then(setTests).catch(() => {});
     apiFetch<Student[]>("/students").then(setStudents).catch(() => {});
     apiFetch<Class[]>("/classes").then(setClasses).catch(() => {});
+    apiFetch<MathTest[]>("/math-tests").then(setMathTests).catch(() => {});
   }, []);
+
+  const loadMathAnalytics = async () => {
+    if (!mathTestId) return;
+    setMathLoading(true);
+    setMathData(null);
+    try {
+      const d = await apiFetch<MathAnalyticsData>(`/analytics/math/questions/${mathTestId}`);
+      setMathData(d);
+    } catch { /* ignore */ } finally { setMathLoading(false); }
+  };
 
   const load = () => {
     if (!testId) return;
@@ -163,7 +186,117 @@ export default function AnalyticsPage() {
 
   return (
     <div>
-      <h1 className="text-xl font-bold mb-6 text-gray-900 dark:text-gray-100">분석 대시보드</h1>
+      <h1 className="text-xl font-bold mb-4 text-gray-900 dark:text-gray-100">분석 대시보드</h1>
+
+      {/* 탭 */}
+      <div className="flex gap-1 mb-6 border-b border-gray-200 dark:border-gray-700">
+        {([["admission", "입학테스트 분석"], ["math", "수학 분석"]] as const).map(([key, label]) => (
+          <button key={key} onClick={() => setTab(key)}
+            className={`px-4 py-2 text-sm font-medium transition-colors border-b-2 -mb-px ${
+              tab === key
+                ? "border-indigo-500 text-indigo-600 dark:text-indigo-400"
+                : "border-transparent text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300"
+            }`}>
+            {label}
+          </button>
+        ))}
+      </div>
+
+      {/* ─── 수학 분석 탭 ─── */}
+      {tab === "math" && (
+        <div className="space-y-5">
+          <div className="flex gap-3 items-end flex-wrap">
+            <div>
+              <label className="block text-xs text-gray-500 dark:text-gray-400 mb-1.5">수학 시험 선택</label>
+              <select value={mathTestId} onChange={(e) => { setMathTestId(e.target.value); setMathData(null); }} className={selectCls + " w-72"}>
+                <option value="">-- 시험을 선택하세요 --</option>
+                {mathTests.map((t) => <option key={t.id} value={t.id}>{t.title} ({t.grade} · {t.test_date})</option>)}
+              </select>
+            </div>
+            <button onClick={loadMathAnalytics} disabled={!mathTestId || mathLoading}
+              className="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors disabled:opacity-40 shadow-sm">
+              {mathLoading ? "조회 중..." : "조회"}
+            </button>
+          </div>
+
+          {mathData && mathData.total_students === 0 && (
+            <div className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl p-10 text-center text-gray-400 dark:text-gray-500 shadow-sm">
+              채점 완료된 응시자가 없습니다
+            </div>
+          )}
+
+          {mathData && mathData.total_students > 0 && (
+            <>
+              {/* 요약 */}
+              <div className="bg-indigo-50 dark:bg-indigo-950/40 border border-indigo-200 dark:border-indigo-700 rounded-xl px-5 py-3 text-sm flex gap-6 flex-wrap">
+                <span className="font-semibold text-gray-800 dark:text-gray-100">{mathData.test_title}</span>
+                <span className="text-gray-500 dark:text-gray-400">{mathData.grade}</span>
+                <span className="text-gray-500 dark:text-gray-400">응시 {mathData.total_students}명</span>
+                {mathData.avg_score != null && <span className="text-orange-600 dark:text-orange-400 font-medium">반 평균 {mathData.avg_score}%</span>}
+              </div>
+
+              {/* 문항별 오답률 차트 */}
+              <div className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl p-5 shadow-sm">
+                <h2 className="font-semibold mb-4 text-gray-800 dark:text-gray-100">문항별 오답률 (%)</h2>
+                <ResponsiveContainer width="100%" height={260}>
+                  <BarChart data={mathData.questions} margin={{ top: 4, right: 8, left: 0, bottom: 4 }}>
+                    <XAxis dataKey="question_no" label={{ value: "문항", position: "insideBottom", offset: -2 }} />
+                    <YAxis domain={[0, 100]} unit="%" />
+                    <Tooltip
+                      formatter={(v, name) => [`${v}%`, name === "incorrect_rate" ? "오답률" : "정답률"]}
+                      labelFormatter={(v) => {
+                        const q = mathData.questions.find(q => q.question_no === v);
+                        return q?.tag ? `${v}번 (${q.tag})` : `${v}번`;
+                      }}
+                    />
+                    <Legend formatter={(v) => v === "incorrect_rate" ? "오답률" : "정답률"} />
+                    <Bar dataKey="incorrect_rate" name="incorrect_rate" fill="#f87171">
+                      {mathData.questions.map((q) => (
+                        <Cell key={q.question_no} fill={q.incorrect_rate >= 70 ? "#dc2626" : q.incorrect_rate >= 40 ? "#f87171" : "#fca5a5"} />
+                      ))}
+                    </Bar>
+                    <Bar dataKey="correct_rate" name="correct_rate" fill="#4ade80" />
+                  </BarChart>
+                </ResponsiveContainer>
+              </div>
+
+              {/* 문항 테이블 */}
+              <div className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl overflow-hidden shadow-sm">
+                <table className="w-full text-sm">
+                  <thead className="bg-gray-50 dark:bg-gray-900/50 border-b border-gray-200 dark:border-gray-700">
+                    <tr>
+                      {["문항", "유형 태그", "정답", "오답", "정답률", "오답률"].map((h) => (
+                        <th key={h} className="text-left px-4 py-3 font-semibold text-xs text-gray-500 dark:text-gray-400 uppercase tracking-wide">{h}</th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-gray-100 dark:divide-gray-700">
+                    {mathData.questions.map((q) => (
+                      <tr key={q.question_no} className="hover:bg-gray-50 dark:hover:bg-gray-700/50">
+                        <td className="px-4 py-2 text-gray-700 dark:text-gray-300 font-medium">{q.question_no}번</td>
+                        <td className="px-4 py-2">
+                          {q.tag ? (
+                            <span className="bg-purple-50 dark:bg-purple-950/40 text-purple-700 dark:text-purple-400 px-2 py-0.5 rounded text-xs font-medium">{q.tag}</span>
+                          ) : <span className="text-gray-300 dark:text-gray-600 text-xs">-</span>}
+                        </td>
+                        <td className="px-4 py-2 text-green-700 dark:text-green-400">{q.correct}</td>
+                        <td className="px-4 py-2 text-red-600 dark:text-red-400">{q.incorrect}</td>
+                        <td className="px-4 py-2 text-gray-700 dark:text-gray-300">{q.correct_rate}%</td>
+                        <td className="px-4 py-2 font-medium" style={{ color: q.incorrect_rate >= 70 ? "#dc2626" : q.incorrect_rate >= 40 ? "#ea580c" : "#16a34a" }}>
+                          {q.incorrect_rate}%
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </>
+          )}
+        </div>
+      )}
+
+      {/* ─── 입학테스트 분석 탭 ─── */}
+      {tab === "admission" && <div>
 
       <div className="flex gap-3 mb-6 items-end">
         <div>
@@ -402,7 +535,7 @@ export default function AnalyticsPage() {
       </div>
 
       {/* 학생별 취약 유형 분석 */}
-      <div className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl p-5 shadow-sm">
+      <div className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl p-5 shadow-sm" id="weakness-section">
         <h2 className="font-semibold mb-4 text-gray-800 dark:text-gray-100">학생별 취약 유형 분석</h2>
         <div className="flex gap-3 mb-4 flex-wrap items-end">
           <div>
@@ -456,6 +589,7 @@ export default function AnalyticsPage() {
           </div>
         )}
       </div>
+      </div>}
     </div>
   );
 }

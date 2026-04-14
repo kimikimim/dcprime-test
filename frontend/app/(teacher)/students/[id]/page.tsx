@@ -255,6 +255,57 @@ export default function StudentProfilePage() {
         )}
       </div>
 
+      {/* 수학 성적 */}
+      <div className={card}>
+        <div className="flex items-center justify-between mb-4">
+          <h2 className="font-semibold text-gray-800 dark:text-gray-200">수학 성적</h2>
+          <span className="text-xs text-gray-400 dark:text-gray-500">채점 완료 기준</span>
+        </div>
+        {(profile.math_results ?? []).length > 0 ? (
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b border-gray-100 dark:border-gray-700">
+                  {["시험명","시험일","점수","정답률","반 평균","반 평균 대비","석차"].map((h) => <th key={h} className={thCls}>{h}</th>)}
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-100 dark:divide-gray-700">
+                {(profile.math_results ?? []).map((r) => {
+                  const diff = r.score_pct != null && r.class_avg != null ? Math.round(r.score_pct - r.class_avg) : null;
+                  return (
+                    <tr key={r.id} className="hover:bg-gray-50 dark:hover:bg-gray-700/50">
+                      <td className={tdCls + " font-medium"}>{r.test_title}</td>
+                      <td className="px-4 py-3 text-sm text-gray-500 dark:text-gray-400">{r.test_date ?? "-"}</td>
+                      <td className={tdCls}>{r.score != null && r.total != null ? `${r.score}/${r.total}` : "-"}</td>
+                      <td className={tdCls}>
+                        {r.score_pct != null && (
+                          <span className={`font-semibold ${r.score_pct >= 80 ? "text-green-600 dark:text-green-400" : r.score_pct >= 60 ? "text-yellow-600 dark:text-yellow-400" : "text-red-500 dark:text-red-400"}`}>
+                            {Math.round(r.score_pct)}%
+                          </span>
+                        )}
+                      </td>
+                      <td className={tdCls}>{r.class_avg != null ? `${Math.round(r.class_avg)}%` : "-"}</td>
+                      <td className={tdCls}>
+                        {diff != null ? (
+                          <span className={diff >= 0 ? "text-green-600 dark:text-green-400 font-semibold" : "text-red-500 dark:text-red-400 font-semibold"}>
+                            {diff >= 0 ? "▲" : "▼"}{Math.abs(diff)}%p
+                          </span>
+                        ) : "-"}
+                      </td>
+                      <td className={tdCls}>
+                        {r.class_rank != null ? `${r.class_rank}/${r.class_total}등` : "-"}
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        ) : (
+          <p className="text-gray-400 dark:text-gray-500 text-sm">수학 성적 없음</p>
+        )}
+      </div>
+
       {/* 튜터링 이력 */}
       <div className={card}>
         <div className="flex justify-between items-center mb-4">

@@ -12,6 +12,7 @@ interface MathTest {
   test_date: string;
   num_questions: number;
   has_answers: boolean;
+  tags: Record<string, string>;
 }
 
 export default function MathTestsPage() {
@@ -20,7 +21,9 @@ export default function MathTestsPage() {
   const [error, setError] = useState("");
   const [expandedId, setExpandedId] = useState<number | null>(null);
   const [answers, setAnswers] = useState<number[]>([]);
+  const [tags, setTags] = useState<Record<number, string>>({});
   const [saving, setSaving] = useState(false);
+  const [savingTags, setSavingTags] = useState(false);
   const [editingMeta, setEditingMeta] = useState<number | null>(null);
   const [metaForm, setMetaForm] = useState({ title: "", grade: "중1", test_date: "", num_questions: 20 });
   const [savingMeta, setSavingMeta] = useState(false);
@@ -44,13 +47,24 @@ export default function MathTestsPage() {
   };
 
   const toggleExpand = async (t: MathTest) => {
-    if (expandedId === t.id) { setExpandedId(null); setAnswers([]); return; }
+    if (expandedId === t.id) { setExpandedId(null); setAnswers([]); setTags({}); return; }
     setExpandedId(t.id);
     try {
       const d = await apiFetch<{ answers: number[] }>(`/math-tests/${t.id}/answers`);
       setAnswers(d.answers.length > 0 ? d.answers : Array(t.num_questions).fill(0));
     } catch {
       setAnswers(Array(t.num_questions).fill(0));
+    }
+    // 태그 로드
+    try {
+      const td = await apiFetch<{ tags: Record<string, string> }>(`/math-tests/${t.id}/tags`);
+      const numericTags: Record<number, string> = {};
+      for (const [k, v] of Object.entries(td.tags || {})) {
+        numericTags[Number(k)] = v;
+      }
+      setTags(numericTags);
+    } catch {
+      setTags({});
     }
   };
 
@@ -70,6 +84,26 @@ export default function MathTestsPage() {
     }
   };
 
+  const saveTags = async () => {
+    if (!expandedId) return;
+    setSavingTags(true);
+    try {
+      const strTags: Record<string, string> = {};
+      for (const [k, v] of Object.entries(tags)) {
+        if (v.trim()) strTags[String(k)] = v.trim();
+      }
+      await apiFetch(`/math-tests/${expandedId}/tags`, {
+        method: "PUT",
+        body: JSON.stringify({ tags: strTags }),
+      });
+      load();
+    } catch (e: unknown) {
+      alert(e instanceof Error ? e.message : "태그 저장 실패");
+    } finally {
+      setSavingTags(false);
+    }
+  };
+
   const deleteTest = async (id: number) => {
     if (!confirm("시험을 삭제하시겠습니까?")) return;
     try {
@@ -79,7 +113,7 @@ export default function MathTestsPage() {
         alert(e instanceof Error ? e.message : "삭제 실패");
       }
     }
-    if (expandedId === id) { setExpandedId(null); setAnswers([]); }
+    if (expandedId === id) { setExpandedId(null); setAnswers([]); setTags({}); }
     load();
   };
 
@@ -174,7 +208,12 @@ export default function MathTestsPage() {
                   ) : (
                     <span className="text-xs bg-amber-50 dark:bg-amber-900/40 text-amber-600 dark:text-amber-400 px-2 py-0.5 rounded-full">정답 미등록</span>
                   )}
-                  <span className="text-xs text-indigo-400 dark:text-indigo-500 ml-auto">{expandedId === t.id ? "▲ 접기" : "▼ 정답 등록"}</span>
+                  {Object.keys(t.tags || {}).length > 0 && (
+                    <span className="text-xs bg-purple-50 dark:bg-purple-900/40 text-purple-600 dark:text-purple-400 px-2 py-0.5 rounded-full">
+                      태그 {Object.keys(t.tags).length}개
+                    </span>
+                  )}
+                  <span className="text-xs text-indigo-400 dark:text-indigo-500 ml-auto">{expandedId === t.id ? "▲ 접기" : "▼ 정답/태그 등록"}</span>
                 </button>
                 <button onClick={() => startEditMeta(t)}
                   className="text-xs text-gray-500 dark:text-gray-400 border border-gray-200 dark:border-gray-600 rounded-lg px-2 py-1 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors">
@@ -184,34 +223,64 @@ export default function MathTestsPage() {
               </div>
             )}
 
-            {/* 정답 등록 */}
+            {/* 정답 + 태그 등록 */}
             {expandedId === t.id && (
-              <div className="border-t border-gray-200 dark:border-gray-700 px-5 py-4">
-                <div className="flex justify-between items-center mb-4">
-                  <span className="text-sm font-medium text-gray-700 dark:text-gray-300">정답 입력 (1~5)</span>
-                  <button onClick={saveAnswers} disabled={saving}
-                    className="text-xs bg-indigo-600 hover:bg-indigo-700 text-white px-3 py-1.5 rounded-lg disabled:opacity-50 transition-colors">
-                    {saving ? "저장 중..." : "저장"}
-                  </button>
+              <div className="border-t border-gray-200 dark:border-gray-700 px-5 py-4 space-y-5">
+                {/* 정답 입력 */}
+                <div>
+                  <div className="flex justify-between items-center mb-3">
+                    <span className="text-sm font-semibold text-gray-700 dark:text-gray-300">정답 입력 (1~5)</span>
+                    <button onClick={saveAnswers} disabled={saving}
+                      className="text-xs bg-indigo-600 hover:bg-indigo-700 text-white px-3 py-1.5 rounded-lg disabled:opacity-50 transition-colors">
+                      {saving ? "저장 중..." : "정답 저장"}
+                    </button>
+                  </div>
+                  <div className="grid grid-cols-5 sm:grid-cols-10 gap-2">
+                    {answers.map((ans, idx) => (
+                      <div key={idx} className="flex flex-col items-center gap-1">
+                        <span className="text-xs text-gray-400 dark:text-gray-500">{idx + 1}번</span>
+                        <select
+                          value={ans}
+                          onChange={(e) => {
+                            const next = [...answers];
+                            next[idx] = Number(e.target.value);
+                            setAnswers(next);
+                          }}
+                          className="border border-gray-200 dark:border-gray-600 rounded-lg px-1 py-1 text-sm w-full text-center bg-white dark:bg-gray-700 dark:text-gray-100 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                        >
+                          <option value={0}>-</option>
+                          {[1,2,3,4,5].map((n) => <option key={n} value={n}>{n}</option>)}
+                        </select>
+                      </div>
+                    ))}
+                  </div>
                 </div>
-                <div className="grid grid-cols-5 sm:grid-cols-10 gap-2">
-                  {answers.map((ans, idx) => (
-                    <div key={idx} className="flex flex-col items-center gap-1">
-                      <span className="text-xs text-gray-400 dark:text-gray-500">{idx + 1}번</span>
-                      <select
-                        value={ans}
-                        onChange={(e) => {
-                          const next = [...answers];
-                          next[idx] = Number(e.target.value);
-                          setAnswers(next);
-                        }}
-                        className="border border-gray-200 dark:border-gray-600 rounded-lg px-1 py-1 text-sm w-full text-center bg-white dark:bg-gray-700 dark:text-gray-100 focus:outline-none focus:ring-1 focus:ring-indigo-500"
-                      >
-                        <option value={0}>-</option>
-                        {[1,2,3,4,5].map((n) => <option key={n} value={n}>{n}</option>)}
-                      </select>
+
+                {/* 문항별 태그 입력 */}
+                <div>
+                  <div className="flex justify-between items-center mb-3">
+                    <div>
+                      <span className="text-sm font-semibold text-gray-700 dark:text-gray-300">문항별 개념/유형 태그</span>
+                      <span className="text-xs text-gray-400 dark:text-gray-500 ml-2">예: 함수, 인수분해, 확률</span>
                     </div>
-                  ))}
+                    <button onClick={saveTags} disabled={savingTags}
+                      className="text-xs bg-purple-600 hover:bg-purple-700 text-white px-3 py-1.5 rounded-lg disabled:opacity-50 transition-colors">
+                      {savingTags ? "저장 중..." : "태그 저장"}
+                    </button>
+                  </div>
+                  <div className="grid grid-cols-2 sm:grid-cols-4 md:grid-cols-5 gap-2">
+                    {answers.map((_, idx) => (
+                      <div key={idx} className="flex flex-col gap-1">
+                        <span className="text-xs text-gray-400 dark:text-gray-500">{idx + 1}번</span>
+                        <input
+                          value={tags[idx + 1] ?? ""}
+                          onChange={(e) => setTags({ ...tags, [idx + 1]: e.target.value })}
+                          placeholder="유형 입력"
+                          className="border border-gray-200 dark:border-gray-600 rounded-lg px-2 py-1 text-xs bg-white dark:bg-gray-700 dark:text-gray-100 focus:outline-none focus:ring-1 focus:ring-purple-500"
+                        />
+                      </div>
+                    ))}
+                  </div>
                 </div>
               </div>
             )}
