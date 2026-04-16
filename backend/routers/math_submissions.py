@@ -123,7 +123,7 @@ def list_submissions(
 
 def _bg_grade_math(submission_id: int, image_path: str, answers: list):
     """백그라운드에서 OMR AI 채점"""
-    from ai_utils import ai_text_call
+    from ai_utils import ai_call
     import json as _json
 
     db = SessionLocal()
@@ -138,7 +138,7 @@ def _bg_grade_math(submission_id: int, image_path: str, answers: list):
 [{{"question_no":1,"student_answer":3}},{{"question_no":2,"student_answer":1}},...]
 마킹이 불분명하면 student_answer를 null로."""
 
-        text = ai_text_call(prompt, max_tokens=1000, fast=True)
+        text = ai_call(image_path, prompt, max_tokens=1000, fast=True)
         m = _JSON_FENCE_RE.search(text)
         if m:
             text = m.group(1).strip()
@@ -173,6 +173,114 @@ def _bg_grade_math(submission_id: int, image_path: str, answers: list):
         log.error(f"[MathSubmission] 채점실패: {e}")
     finally:
         db.close()
+
+
+def _bg_grade_math_bulk(submission_id: int, image_path: str, answers: list):
+    """합본 채점: 이미지에서 학생 이름 자동 인식 후 채점"""
+    from ai_utils import ai_call
+    import json as _json
+
+    db = SessionLocal()
+    try:
+        sub = db.query(MathSubmission).filter(MathSubmission.id == submission_id).first()
+        if not sub:
+            return
+
+        prompt = f"""이것은 수학 시험 OMR 답안지입니다.
+답안지에 적힌 학생 이름(이름란, 성명란 등)과 각 문항의 마킹된 번호(1~5)를 읽어주세요.
+정답지(0번 인덱스=1번 문항): {answers}
+반드시 아래 JSON 형식으로만 응답하세요:
+{{"student_name":"홍길동","answers":[{{"question_no":1,"student_answer":3}},{{"question_no":2,"student_answer":1}}]}}
+마킹 불분명시 student_answer=null, 이름 인식 불가시 student_name=null"""
+
+        text = ai_call(image_path, prompt, max_tokens=1500, fast=True)
+        m = _JSON_FENCE_RE.search(text)
+        if m:
+            text = m.group(1).strip()
+        result = _json.loads(text)
+
+        detected_name = result.get("student_name")
+        if detected_name:
+            sub.student_name = detected_name
+            student = db.query(Student).filter(Student.name == detected_name).first()
+            if student:
+                sub.student_id = student.id
+
+        results = result.get("answers", [])
+        score = 0
+        for r in results:
+            qno = r["question_no"]
+            stu = r.get("student_answer")
+            cor = answers[qno - 1] if 0 < qno <= len(answers) else 0
+            is_correct = (stu is not None and stu == cor)
+            if is_correct:
+                score += 1
+            db.add(MathSubmissionItem(
+                submission_id=submission_id,
+                question_no=qno,
+                student_answer=stu,
+                correct_answer=cor,
+                is_correct=is_correct,
+            ))
+        sub.score = score
+        sub.total = len(answers)
+        sub.status = "graded"
+        db.commit()
+        log.info(f"[MathSubmission] 합본채점완료: sub_id={submission_id} {detected_name} {score}/{len(answers)}")
+    except Exception as e:
+        db.rollback()
+        sub = db.query(MathSubmission).filter(MathSubmission.id == submission_id).first()
+        if sub:
+            sub.status = "error"
+            db.commit()
+        log.error(f"[MathSubmission] 합본채점실패: {e}")
+    finally:
+        db.close()
+
+
+@router.post("/bulk", status_code=201)
+@limiter.limit("30/minute")
+async def upload_bulk_omr(
+    request: Request,
+    background_tasks: BackgroundTasks,
+    test_id: int = Form(...),
+    images: List[UploadFile] = File(...),
+    db: Session = Depends(get_db),
+):
+    """여러 학생 OMR 합본 업로드 - AI가 각 이미지에서 학생 이름 자동 인식 후 채점"""
+    test = db.query(MathTest).filter(MathTest.id == test_id).first()
+    if not test:
+        raise HTTPException(404, "시험을 찾을 수 없습니다")
+    if not test.answers or not any(a > 0 for a in test.answers):
+        raise HTTPException(400, "정답이 등록되지 않은 시험입니다")
+
+    UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
+    created = []
+    for image in images:
+        image_bytes = await image.read()
+        if len(image_bytes) > MAX_UPLOAD_IMAGE:
+            continue
+
+        sub = MathSubmission(
+            math_test_id=test.id,
+            student_id=None,
+            student_name="인식중...",
+            status="pending",
+            total=test.num_questions,
+        )
+        db.add(sub)
+        db.flush()
+
+        ext = Path(image.filename).suffix if image.filename else ".jpg"
+        img_path = UPLOAD_DIR / f"math_sub_{sub.id}{ext}"
+        img_path.write_bytes(image_bytes)
+        sub.image_path = str(img_path)
+        db.commit()
+
+        background_tasks.add_task(_bg_grade_math_bulk, sub.id, str(img_path), list(test.answers))
+        created.append({"id": sub.id, "filename": image.filename})
+
+    return {"created": len(created), "submissions": created}
 
 
 @router.post("", status_code=201)

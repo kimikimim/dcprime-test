@@ -32,6 +32,7 @@ const menus = [
     items: [
       { href: "/math-tests", label: "시험 관리" },
       { href: "/math-submissions", label: "OMR 채점" },
+      { href: "/math-bulk-grade", label: "반별 채점" },
       { href: "/math-history", label: "성적 추이" },
     ],
   },
