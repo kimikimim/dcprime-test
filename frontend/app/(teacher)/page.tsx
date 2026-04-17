@@ -24,6 +24,13 @@ const mathCards = [
   { href: "/math-history", label: "성적 추이", desc: "학생별 시험 성적 추이 및 오답 분석", icon: "📈" },
 ];
 
+const reportCards = [
+  { href: "/word-tutoring", label: "튜터링 이력", desc: "영어 튜터링 세션 기록 조회", icon: "📖" },
+  { href: "/math-history", label: "수학 성적 추이", desc: "학생별 수학 성적 변화 추이", icon: "📈" },
+  { href: "/math-history?tab=class", label: "반별 성적", desc: "반별 수학 성적 비교 분석", icon: "🏫" },
+  { href: "/subject-analysis", label: "세부 분석", desc: "과목별 개인 성취도 심층 분석", icon: "🔍" },
+];
+
 interface NasFolder { count: number; files: string[] }
 interface NasStatus {
   ungraded_entrance: NasFolder;
@@ -100,6 +107,24 @@ export default function Home() {
               className="group flex flex-col bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-4 hover:shadow-md hover:border-orange-400 dark:hover:border-orange-500 transition-all duration-200">
               <span className="text-2xl mb-2">{c.icon}</span>
               <div className="text-sm font-semibold text-orange-700 dark:text-orange-400 mb-1">{c.label}</div>
+              <div className="text-xs text-gray-500 dark:text-gray-400 leading-relaxed">{c.desc}</div>
+            </Link>
+          ))}
+        </div>
+      </div>
+
+      <div>
+        <div className="flex items-center gap-3 mb-4">
+          <span className="bg-violet-600 text-white text-xs font-bold px-3 py-1.5 rounded-full shadow-sm">분석리포트</span>
+          <h2 className="text-base font-bold text-gray-700 dark:text-gray-200">분석 리포트</h2>
+          <div className="flex-1 h-px bg-gray-200 dark:bg-gray-700" />
+        </div>
+        <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+          {reportCards.map((c) => (
+            <Link key={c.href} href={c.href}
+              className="group flex flex-col bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-4 hover:shadow-md hover:border-violet-400 dark:hover:border-violet-500 transition-all duration-200">
+              <span className="text-2xl mb-2">{c.icon}</span>
+              <div className="text-sm font-semibold text-violet-700 dark:text-violet-400 mb-1">{c.label}</div>
               <div className="text-xs text-gray-500 dark:text-gray-400 leading-relaxed">{c.desc}</div>
             </Link>
           ))}
