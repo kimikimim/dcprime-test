@@ -116,9 +116,15 @@ def grade_omr(image_path: str, num_questions: int, debug_dir: str = None) -> dic
 # ──────────────────────────────────────────────────────────────
 
 def _load(path: str) -> np.ndarray:
-    img = cv2.imread(str(path), cv2.IMREAD_GRAYSCALE)
+    """이미지(jpg/png/webp) 또는 PDF(첫 페이지) 로드 → grayscale ndarray"""
+    if Path(path).suffix.lower() == ".pdf":
+        img = _pdf_first_page(path)
+    else:
+        img = cv2.imread(str(path), cv2.IMREAD_GRAYSCALE)
+
     if img is None:
         raise ValueError(f"이미지 로드 실패: {path}")
+
     h, w = img.shape
     longest = max(h, w)
     if longest > MAX_SIZE:
@@ -126,6 +132,19 @@ def _load(path: str) -> np.ndarray:
         img = cv2.resize(img, (int(w * scale), int(h * scale)),
                          interpolation=cv2.INTER_AREA)
     return img
+
+
+def _pdf_first_page(path: str) -> np.ndarray:
+    """PDF 첫 페이지를 grayscale ndarray로 변환 (PyMuPDF 사용)"""
+    import fitz  # PyMuPDF (requirements.txt에 이미 포함)
+    doc = fitz.open(str(path))
+    page = doc[0]
+    # 200 DPI 기준 렌더링
+    mat = fitz.Matrix(200 / 72, 200 / 72)
+    pix = page.get_pixmap(matrix=mat, colorspace=fitz.csGRAY)
+    doc.close()
+    arr = np.frombuffer(pix.samples, dtype=np.uint8)
+    return arr.reshape(pix.height, pix.width)
 
 
 def _fix_orientation(img: np.ndarray) -> tuple:
