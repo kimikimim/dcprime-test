@@ -131,9 +131,11 @@ def _bg_grade_math(submission_id: int, image_path: str, answers: list):
         if not sub:
             return
 
-        result = grade_omr(image_path, len(answers))
+        debug_dir = str(UPLOAD_DIR / "omr_debug")
+        result = grade_omr(image_path, len(answers), debug_dir=debug_dir)
         student_answers = result["answers"]
 
+        log.info(f"[MathSubmission] CV결과: sub_id={submission_id} flipped={result['flipped']} answers={student_answers}")
         if result["flipped"]:
             log.info(f"[MathSubmission] 좌우반전 감지 후 보정: sub_id={submission_id}")
 
