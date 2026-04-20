@@ -74,7 +74,7 @@ export default function StudentsPage() {
       name: s.name,
       grade: s.grade,
       school: s.school ?? "",
-      class_ids: s.class_ids.map(String),
+      class_ids: (s.class_ids ?? []).map(String),
       phone: s.phone ?? "",
       teacher: s.teacher ?? "",
     });
@@ -275,8 +275,8 @@ export default function StudentsPage() {
                     <td className="px-4 py-3 text-gray-700 dark:text-gray-300">{s.grade}</td>
                     <td className="px-4 py-3 text-gray-600 dark:text-gray-400">{s.school ?? "-"}</td>
                     <td className="px-4 py-3 text-gray-600 dark:text-gray-400">
-                      {s.class_names.length > 0
-                        ? <span className="flex flex-wrap gap-1">{s.class_names.map((n) => <span key={n} className="bg-indigo-50 dark:bg-indigo-900/30 text-indigo-700 dark:text-indigo-300 text-xs px-1.5 py-0.5 rounded">{n}</span>)}</span>
+                      {(s.class_names ?? []).length > 0
+                        ? <span className="flex flex-wrap gap-1">{(s.class_names ?? []).map((n) => <span key={n} className="bg-indigo-50 dark:bg-indigo-900/30 text-indigo-700 dark:text-indigo-300 text-xs px-1.5 py-0.5 rounded">{n}</span>)}</span>
                         : <span className="text-gray-400 dark:text-gray-500">미배정</span>}
                     </td>
                     <td className="px-4 py-3 text-gray-600 dark:text-gray-400">{s.phone ?? "-"}</td>

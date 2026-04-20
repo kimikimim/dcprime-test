@@ -73,7 +73,7 @@ export default function SubjectAnalysisPage() {
 
   // 영어 차트 데이터
   const wordChartData = wordSubs.map((s) => ({
-    name: s.test_title.length > 8 ? s.test_title.slice(0, 8) + "…" : s.test_title,
+    name: (s.test_title ?? "").length > 8 ? (s.test_title ?? "").slice(0, 8) + "…" : (s.test_title ?? ""),
     fullName: s.test_title,
     pct: s.score != null && s.total ? Math.round((s.score / s.total) * 100) : 0,
     score: s.score, total: s.total,
@@ -84,7 +84,7 @@ export default function SubjectAnalysisPage() {
 
   // 수학 차트 데이터
   const mathChartData = mathSubs.map((s) => ({
-    name: s.test_title.length > 8 ? s.test_title.slice(0, 8) + "…" : s.test_title,
+    name: (s.test_title ?? "").length > 8 ? (s.test_title ?? "").slice(0, 8) + "…" : (s.test_title ?? ""),
     fullName: s.test_title,
     date: s.test_date,
     pct: s.score != null && s.total ? Math.round((s.score / s.total) * 100) : 0,
