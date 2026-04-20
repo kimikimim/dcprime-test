@@ -82,7 +82,7 @@ function MathHistoryContent() {
     const pct = Math.round((s.score / s.total) * 100);
     const classAvgPct = s.class_avg != null ? Math.round(s.class_avg) : null;
     return {
-      name: s.test_title.length > 8 ? s.test_title.slice(0, 8) + "…" : s.test_title,
+      name: (s.test_title ?? "").length > 8 ? (s.test_title ?? "").slice(0, 8) + "…" : (s.test_title ?? ""),
       fullName: s.test_title,
       date: s.test_date,
       pct,
