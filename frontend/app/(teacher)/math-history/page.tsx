@@ -30,6 +30,7 @@ interface MathSubmissionDetail {
     correct_answer: number;
     is_correct: boolean;
     tag: string | null;
+    tip: string | null;
   }[];
 }
 
@@ -145,6 +146,18 @@ function MathHistoryContent() {
       `<span class="badge red">${tag} (${qnos.map(q => q + "번").join(", ")})</span>`
     ).join("") || "";
 
+    // 오답 문항별 학습 가이드
+    const studyGuideHtml = (s.items ?? [])
+      .filter(i => !i.is_correct && i.tip)
+      .sort((a, b) => a.question_no - b.question_no)
+      .map(i => `
+        <div class="tip-card">
+          <div class="tip-head">${i.question_no}번 문항</div>
+          ${i.tag ? `<div class="tip-concept">${i.tag}</div>` : ""}
+          <div class="tip-body">💡 ${i.tip}</div>
+        </div>`
+      ).join("");
+
     // 문항별 정답/오답 막대
     const barItems = (s.items ?? []).map((item) => `
       <div class="bar-item">
@@ -186,6 +199,10 @@ function MathHistoryContent() {
   .badge { display:inline-block; padding:2px 8px; border-radius:999px; font-size:12px; font-weight:500; margin:2px; }
   .badge.red { background:#fee2e2; color:#dc2626; }
   .badge.green { background:#dcfce7; color:#16a34a; }
+  .tip-card { background:#eff6ff; border:1px solid #bfdbfe; border-radius:8px; padding:12px 14px; margin-bottom:8px; }
+  .tip-card .tip-head { font-size:12px; font-weight:700; color:#1d4ed8; margin-bottom:4px; }
+  .tip-card .tip-concept { font-size:11px; color:#6b7280; margin-bottom:6px; }
+  .tip-card .tip-body { font-size:13px; color:#374151; line-height:1.6; }
   .diff { font-size:13px; font-weight:600; }
   .print-btn { display:block; margin:24px auto 0; padding:10px 28px; background:#2563eb; color:#fff; border:none; border-radius:8px; font-size:14px; font-weight:600; cursor:pointer; }
   @media print { .print-btn { display:none; } body { background:#fff; padding:0; } .report { box-shadow:none; border:none; } }
@@ -230,6 +247,10 @@ function MathHistoryContent() {
     <p style="font-size:13px;color:#374151;margin-bottom:6px;"><b>취약 유형</b></p>
     <div>${weakTagHtml}</div>
   </div>` : ""}
+
+  ${studyGuideHtml ? `
+  <div class="section-title">📚 오답 문항 학습 가이드</div>
+  ${studyGuideHtml}` : ""}
 
   <button class="print-btn" onclick="window.print()">인쇄 / PDF 저장</button>
 </div>

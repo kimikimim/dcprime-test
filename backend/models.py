@@ -215,6 +215,7 @@ class MathTest(Base):
     num_questions = Column(Integer, nullable=False, default=0)
     answers = Column(JSON, nullable=False, default=[])
     tags = Column(JSON, nullable=True, default={})  # {question_no: tag} e.g. {"1": "함수", "2": "인수분해"}
+    tips = Column(JSON, nullable=True, default={})  # {question_no: tip} e.g. {"1": "동류항 정리 반복 연습 필요"}
     source_file = Column(String(500), nullable=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     submissions = relationship("MathSubmission", back_populates="math_test", cascade="all, delete-orphan")
