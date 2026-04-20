@@ -17,3 +17,4 @@ slowapi==0.1.9
 pyhwp
 six
 opencv-python-headless
+olefile
