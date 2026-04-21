@@ -34,11 +34,22 @@ interface MathSubmissionDetail {
   }[];
 }
 
+const SUBJECTS = ["수학", "국어", "영어", "과학"] as const;
+type Subject = typeof SUBJECTS[number];
+
+function subjectMatch(title: string, subject: Subject) {
+  if (subject === "국어") return title.includes("국어");
+  if (subject === "영어") return title.includes("영어");
+  if (subject === "과학") return title.includes("과학");
+  return !title.includes("국어") && !title.includes("영어") && !title.includes("과학");
+}
+
 function MathHistoryContent() {
   const searchParams = useSearchParams();
   const [tab, setTab] = useState<"individual" | "class">(
     searchParams.get("tab") === "class" ? "class" : "individual"
   );
+  const [subject, setSubject] = useState<Subject>("수학");
 
   // 개별 성적
   const [students, setStudents] = useState<Student[]>([]);
@@ -75,8 +86,12 @@ function MathHistoryContent() {
       .finally(() => setClassLoading(false));
   }, [classTestId]);
 
+  // 과목 변경 시 시험 선택 초기화
+  useEffect(() => { setClassTestId(""); setSelectedId(""); }, [subject]);
+
   const selected = students.find((s) => String(s.id) === selectedId);
-  const graded = submissions.filter((s) => s.status === "graded" && s.total > 0);
+  const filteredTests = mathTests.filter((t) => subjectMatch(t.title, subject));
+  const graded = submissions.filter((s) => s.status === "graded" && s.total > 0 && subjectMatch(s.test_title ?? "", subject));
 
   // 성적 추이 데이터
   const trendData = graded.map((s) => {
@@ -329,7 +344,22 @@ function MathHistoryContent() {
 
   return (
     <div>
-      <h1 className="text-xl font-bold mb-4 text-gray-900 dark:text-gray-100">수학 성적 추이</h1>
+      <div className="flex items-center gap-4 mb-4 flex-wrap">
+        <h1 className="text-xl font-bold text-gray-900 dark:text-gray-100">{subject} 성적 추이</h1>
+        {/* 과목 탭 */}
+        <div className="flex gap-1">
+          {SUBJECTS.map((s) => (
+            <button key={s} onClick={() => setSubject(s)}
+              className={`px-3 py-1 rounded-full text-sm font-medium transition-colors ${
+                subject === s
+                  ? "bg-orange-500 text-white shadow-sm"
+                  : "bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600"
+              }`}>
+              {s}
+            </button>
+          ))}
+        </div>
+      </div>
 
       {/* 탭 */}
       <div className="flex gap-1 mb-6 border-b border-gray-200 dark:border-gray-700">
@@ -351,7 +381,7 @@ function MathHistoryContent() {
           <div className="flex gap-3 items-center mb-6 flex-wrap">
             <select value={classTestId} onChange={(e) => setClassTestId(e.target.value)} className={inputCls + " w-72"}>
               <option value="">시험 선택...</option>
-              {mathTests.map((t) => (
+              {filteredTests.map((t) => (
                 <option key={t.id} value={t.id}>{t.title} ({t.grade} · {t.test_date})</option>
               ))}
             </select>

@@ -42,34 +42,11 @@ const menus: Menu[] = [
   },
   {
     label: "분석리포트",
-    groups: [
-      {
-        groupLabel: "국어",
-        items: [
-          { href: "/math-history?subject=korean", label: "성적 추이" },
-          { href: "/math-history?subject=korean&tab=class", label: "반별 성적" },
-        ],
-      },
-      {
-        groupLabel: "수학",
-        items: [
-          { href: "/math-history", label: "성적 추이" },
-          { href: "/math-history?tab=class", label: "반별 성적" },
-        ],
-      },
-      {
-        groupLabel: "영어",
-        items: [
-          { href: "/word-tutoring", label: "튜터링 이력" },
-        ],
-      },
-      {
-        groupLabel: "과학",
-        items: [
-          { href: "/math-history?subject=science", label: "성적 추이" },
-          { href: "/math-history?subject=science&tab=class", label: "반별 성적" },
-        ],
-      },
+    items: [
+      { href: "/math-history", label: "성적 추이" },
+      { href: "/math-history?tab=class", label: "반별 성적" },
+      { href: "/word-tutoring", label: "튜터링 이력" },
+      { href: "/subject-analysis", label: "세부 분석" },
     ],
   },
 ];
