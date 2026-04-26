@@ -2,7 +2,7 @@ import io
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, File
 from config import MAX_UPLOAD_EXCEL
 from fastapi.responses import StreamingResponse
-from sqlalchemy.orm import Session, joinedload
+from sqlalchemy.orm import Session, joinedload, selectinload
 from pydantic import BaseModel
 from typing import List, Optional
 from database import get_db
@@ -54,7 +54,7 @@ def list_students(
     name: Optional[str] = None,
     db: Session = Depends(get_db),
 ):
-    q = db.query(models.Student).options(joinedload(models.Student.classes))
+    q = db.query(models.Student).options(selectinload(models.Student.classes))
     if grade:
         q = q.filter(models.Student.grade == grade)
     if school:

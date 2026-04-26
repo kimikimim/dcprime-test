@@ -21,7 +21,7 @@ const menus: Menu[] = [
     ],
   },
   {
-    label: "영어",
+    label: "단어시험",
     items: [
       { href: "/word-tests", label: "단어시험 관리" },
       { href: "/word-submissions", label: "단어시험 채점" },
@@ -29,34 +29,34 @@ const menus: Menu[] = [
       { href: "/word-tutoring", label: "튜터링 기록" },
       { href: "/word-config", label: "채점 설정" },
       { href: "/word-answer-key", label: "답지 등록" },
-      { href: "/english-history", label: "성적 추이" },
     ],
   },
   {
-    label: "수학",
-    items: [
-      { href: "/math-tests", label: "시험 관리" },
-      { href: "/math-submissions", label: "OMR 채점" },
-      { href: "/math-bulk-grade", label: "반별 채점" },
-      { href: "/math-history", label: "성적 추이" },
-    ],
-  },
-  {
-    label: "국어",
-    items: [
-      { href: "/korean-history", label: "성적 추이" },
-    ],
-  },
-  {
-    label: "과학",
-    items: [
-      { href: "/science-history", label: "성적 추이" },
+    label: "과목시험",
+    groups: [
+      {
+        groupLabel: "관리",
+        items: [
+          { href: "/math-tests", label: "시험 관리" },
+          { href: "/math-submissions", label: "OMR 채점" },
+          { href: "/math-bulk-grade", label: "반별 채점" },
+        ],
+      },
+      {
+        groupLabel: "성적 추이",
+        items: [
+          { href: "/korean-history", label: "국어" },
+          { href: "/english-history", label: "영어" },
+          { href: "/math-history", label: "수학" },
+          { href: "/science-history", label: "과학" },
+        ],
+      },
     ],
   },
   {
     label: "분석리포트",
     items: [
-      { href: "/subject-analysis", label: "세부 분석" },
+      { href: "/subject-analysis", label: "학생 세부 분석" },
       { href: "/word-tutoring", label: "튜터링 이력" },
     ],
   },

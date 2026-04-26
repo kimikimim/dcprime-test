@@ -19,16 +19,14 @@ const wordCards = [
 ];
 
 const mathCards = [
-  { href: "/math-tests", label: "시험 관리", desc: "수학 시험 생성 및 정답 등록", icon: "📐" },
+  { href: "/math-tests", label: "시험 관리", desc: "국/영/수/과 시험 생성 및 정답 등록", icon: "📐" },
   { href: "/math-submissions", label: "OMR 채점", desc: "OMR 답안지 업로드 및 결과 조회", icon: "📋" },
-  { href: "/math-history", label: "성적 추이", desc: "학생별 시험 성적 추이 및 오답 분석", icon: "📈" },
+  { href: "/math-bulk-grade", label: "반별 채점", desc: "반 전체 답안지 일괄 채점", icon: "📊" },
 ];
 
 const reportCards = [
+  { href: "/subject-analysis", label: "학생 세부 분석", desc: "과목별 개인 성취도 심층 분석", icon: "🔍" },
   { href: "/word-tutoring", label: "튜터링 이력", desc: "영어 튜터링 세션 기록 조회", icon: "📖" },
-  { href: "/math-history", label: "수학 성적 추이", desc: "학생별 수학 성적 변화 추이", icon: "📈" },
-  { href: "/math-history?tab=class", label: "반별 성적", desc: "반별 수학 성적 비교 분석", icon: "🏫" },
-  { href: "/subject-analysis", label: "세부 분석", desc: "과목별 개인 성취도 심층 분석", icon: "🔍" },
 ];
 
 interface NasFolder { count: number; files: string[] }
@@ -79,8 +77,8 @@ export default function Home() {
 
       <div>
         <div className="flex items-center gap-3 mb-4">
-          <span className="bg-emerald-600 text-white text-xs font-bold px-3 py-1.5 rounded-full shadow-sm">영어단어</span>
-          <h2 className="text-base font-bold text-gray-700 dark:text-gray-200">영어단어 튜터링</h2>
+          <span className="bg-emerald-600 text-white text-xs font-bold px-3 py-1.5 rounded-full shadow-sm">단어시험</span>
+          <h2 className="text-base font-bold text-gray-700 dark:text-gray-200">영어 단어시험</h2>
           <div className="flex-1 h-px bg-gray-200 dark:bg-gray-700" />
         </div>
         <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
@@ -97,8 +95,8 @@ export default function Home() {
 
       <div>
         <div className="flex items-center gap-3 mb-4">
-          <span className="bg-orange-600 text-white text-xs font-bold px-3 py-1.5 rounded-full shadow-sm">수학</span>
-          <h2 className="text-base font-bold text-gray-700 dark:text-gray-200">수학 튜터링</h2>
+          <span className="bg-orange-600 text-white text-xs font-bold px-3 py-1.5 rounded-full shadow-sm">과목시험</span>
+          <h2 className="text-base font-bold text-gray-700 dark:text-gray-200">과목시험 관리</h2>
           <div className="flex-1 h-px bg-gray-200 dark:bg-gray-700" />
         </div>
         <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
