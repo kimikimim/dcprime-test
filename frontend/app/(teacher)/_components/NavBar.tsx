@@ -29,6 +29,7 @@ const menus: Menu[] = [
       { href: "/word-tutoring", label: "튜터링 기록" },
       { href: "/word-config", label: "채점 설정" },
       { href: "/word-answer-key", label: "답지 등록" },
+      { href: "/english-history", label: "성적 추이" },
     ],
   },
   {
@@ -41,12 +42,22 @@ const menus: Menu[] = [
     ],
   },
   {
+    label: "국어",
+    items: [
+      { href: "/korean-history", label: "성적 추이" },
+    ],
+  },
+  {
+    label: "과학",
+    items: [
+      { href: "/science-history", label: "성적 추이" },
+    ],
+  },
+  {
     label: "분석리포트",
     items: [
-      { href: "/math-history", label: "성적 추이" },
-      { href: "/math-history?tab=class", label: "반별 성적" },
-      { href: "/word-tutoring", label: "튜터링 이력" },
       { href: "/subject-analysis", label: "세부 분석" },
+      { href: "/word-tutoring", label: "튜터링 이력" },
     ],
   },
 ];
