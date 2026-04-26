@@ -7,12 +7,8 @@ import {
   XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell, Legend,
 } from "recharts";
 
-interface StudentItem { id: number; name: string; grade: string; }
 
-interface WordSub {
-  id: number; test_title: string; status: string;
-  score: number | null; total: number | null; submitted_at: string;
-}
+interface StudentItem { id: number; name: string; grade: string; }
 
 interface MathSub {
   id: number; test_title: string; test_date: string | null;
@@ -29,13 +25,13 @@ function shorten(s: string) { return s.length > 10 ? s.slice(0, 10) + "…" : s;
 const SECTION_HEADER = "flex items-center gap-2 mb-4";
 const EMPTY_BOX = card + " py-10 text-center text-sm text-gray-400 dark:text-gray-500";
 
-/* ── 수학/국어/과학 섹션 ─────────────────────────────────────── */
+/* ── 과목 섹션 (국어/영어/수학/과학 공용) ────────────────────── */
 function MathSubjectSection({ subject, subs, color }: {
-  subject: "국어" | "수학" | "과학";
+  subject: "국어" | "영어" | "수학" | "과학";
   subs: MathSub[];
   color: { line: string; badge: string; header: string };
 }) {
-  const ICONS: Record<string, string> = { 국어: "📖", 수학: "📐", 과학: "🔬" };
+  const ICONS: Record<string, string> = { 국어: "📖", 영어: "📝", 수학: "📐", 과학: "🔬" };
 
   const header = (
     <div className={SECTION_HEADER}>
@@ -177,97 +173,10 @@ function MathSubjectSection({ subject, subs, color }: {
   );
 }
 
-/* ── 영어 단어시험 섹션 ─────────────────────────────────────── */
-function WordSection({ subs }: { subs: WordSub[] }) {
-  const header = (
-    <div className={SECTION_HEADER}>
-      <span className="text-xs font-bold px-3 py-1 rounded-full text-white bg-emerald-600">📚 영어 단어시험</span>
-      <div className="flex-1 h-px bg-gray-200 dark:bg-gray-700" />
-    </div>
-  );
-
-  if (subs.length === 0) {
-    return (
-      <div>
-        {header}
-        <div className={EMPTY_BOX}>채점 완료된 영어 단어시험 데이터가 없습니다</div>
-      </div>
-    );
-  }
-
-  const chartData = subs.map((s) => ({
-    name: shorten(s.test_title ?? ""),
-    fullName: s.test_title,
-    pct: s.score != null && s.total ? Math.round((s.score / s.total) * 100) : 0,
-    score: s.score, total: s.total,
-  }));
-  const avg = Math.round(chartData.reduce((a, d) => a + d.pct, 0) / chartData.length);
-
-  return (
-    <div className="space-y-4">
-      {header}
-
-      <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-        {[
-          { label: "총 응시", value: `${subs.length}회` },
-          { label: "전체 평균", value: `${avg}%` },
-          { label: "최근 시험", value: `${chartData[chartData.length - 1]?.pct ?? "-"}%` },
-        ].map(({ label, value }) => (
-          <div key={label} className={card}>
-            <p className="text-xs text-gray-400 dark:text-gray-500 mb-1">{label}</p>
-            <p className="text-2xl font-bold text-emerald-600 dark:text-emerald-400">{value}</p>
-          </div>
-        ))}
-      </div>
-
-      <div className={card}>
-        <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-4">점수 추이</h3>
-        <ResponsiveContainer width="100%" height={220}>
-          <LineChart data={chartData} margin={{ top: 5, right: 20, left: 0, bottom: 5 }}>
-            <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
-            <XAxis dataKey="name" tick={{ fontSize: 10, fill: "#9ca3af" }} />
-            <YAxis domain={[0, 100]} tickFormatter={(v) => `${v}%`} tick={{ fontSize: 10, fill: "#9ca3af" }} />
-            <Tooltip
-              formatter={(v, _, p) => [`${v}% (${p.payload.score}/${p.payload.total})`, "점수"]}
-              labelFormatter={(_, pl) => pl?.[0]?.payload?.fullName ?? ""}
-              contentStyle={{ fontSize: 11, borderRadius: 6 }}
-            />
-            <Line type="monotone" dataKey="pct" stroke="#10b981" strokeWidth={2.5} dot={{ r: 4, fill: "#10b981" }} activeDot={{ r: 6 }} />
-          </LineChart>
-        </ResponsiveContainer>
-      </div>
-
-      <div className={card + " overflow-x-auto p-0"}>
-        <table className="w-full text-sm">
-          <thead className="bg-gray-50 dark:bg-gray-900/50 border-b border-gray-200 dark:border-gray-700">
-            <tr>{["시험명","점수","정답률","응시일"].map((h) => (
-              <th key={h} className="text-left px-4 py-3 font-semibold text-xs text-gray-500 dark:text-gray-400 uppercase tracking-wide">{h}</th>
-            ))}</tr>
-          </thead>
-          <tbody className="divide-y divide-gray-100 dark:divide-gray-700">
-            {subs.map((s) => {
-              const pct = s.score != null && s.total ? Math.round((s.score / s.total) * 100) : null;
-              return (
-                <tr key={s.id} className="hover:bg-gray-50 dark:hover:bg-gray-700/30">
-                  <td className="px-4 py-3 font-medium text-gray-800 dark:text-gray-100">{s.test_title}</td>
-                  <td className="px-4 py-3 text-gray-700 dark:text-gray-300">{s.score}/{s.total}</td>
-                  <td className="px-4 py-3">{pct != null && <span className={`font-semibold ${pct >= 85 ? "text-emerald-600 dark:text-emerald-400" : pct >= 65 ? "text-yellow-600" : "text-red-500"}`}>{pct}%</span>}</td>
-                  <td className="px-4 py-3 text-gray-500 dark:text-gray-400 text-xs">{s.submitted_at.slice(0, 10)}</td>
-                </tr>
-              );
-            })}
-          </tbody>
-        </table>
-      </div>
-    </div>
-  );
-}
-
 /* ── 메인 페이지 ─────────────────────────────────────────────── */
 export default function SubjectAnalysisPage() {
   const [students, setStudents] = useState<StudentItem[]>([]);
   const [selectedId, setSelectedId] = useState("");
-  const [wordSubs, setWordSubs] = useState<WordSub[]>([]);
   const [mathSubs, setMathSubs] = useState<MathSub[]>([]);
   const [loading, setLoading] = useState(false);
 
@@ -275,22 +184,14 @@ export default function SubjectAnalysisPage() {
     apiFetch<StudentItem[]>("/students").then(setStudents).catch(() => {});
   }, []);
 
-  const selected = students.find((s) => String(s.id) === selectedId);
-
   useEffect(() => {
-    if (!selected) { setWordSubs([]); setMathSubs([]); return; }
+    if (!selectedId) { setMathSubs([]); return; }
     setLoading(true);
-    Promise.all([
-      apiFetch<WordSub[]>(`/word-submissions?student_name=${encodeURIComponent(selected.name)}&grade=${encodeURIComponent(selected.grade)}`)
-        .then((d) => d.filter((s) => s.status === "confirmed" && s.score != null))
-        .catch(() => [] as WordSub[]),
-      apiFetch<MathSub[]>(`/math-submissions?student_id=${selectedId}&detail=true`)
-        .then((d) => d.filter((s) => s.status === "graded" && s.total != null && s.total > 0))
-        .catch(() => [] as MathSub[]),
-    ]).then(([word, math]) => {
-      setWordSubs(word);
-      setMathSubs(math);
-    }).finally(() => setLoading(false));
+    apiFetch<MathSub[]>(`/math-submissions?student_id=${selectedId}&detail=true`)
+      .then((d) => d.filter((s) => s.status === "graded" && s.total != null && s.total > 0))
+      .catch(() => [] as MathSub[])
+      .then(setMathSubs)
+      .finally(() => setLoading(false));
   }, [selectedId]);
 
   return (
@@ -321,7 +222,8 @@ export default function SubjectAnalysisPage() {
         <div className="space-y-10">
           <MathSubjectSection subject="국어" subs={mathSubs.filter((s) => subjectMatch(s.test_title ?? "", "국어"))}
             color={{ line: "#7c3aed", badge: "text-violet-600 dark:text-violet-400", header: "bg-violet-600" }} />
-          <WordSection subs={wordSubs} />
+          <MathSubjectSection subject="영어" subs={mathSubs.filter((s) => subjectMatch(s.test_title ?? "", "영어"))}
+            color={{ line: "#10b981", badge: "text-emerald-600 dark:text-emerald-400", header: "bg-emerald-600" }} />
           <MathSubjectSection subject="수학" subs={mathSubs.filter((s) => subjectMatch(s.test_title ?? "", "수학"))}
             color={{ line: "#f97316", badge: "text-orange-600 dark:text-orange-400", header: "bg-orange-600" }} />
           <MathSubjectSection subject="과학" subs={mathSubs.filter((s) => subjectMatch(s.test_title ?? "", "과학"))}
