@@ -70,6 +70,35 @@ def list_students(
 
 @router.post("", response_model=StudentOut, status_code=201)
 def create_student(data: StudentCreate, db: Session = Depends(get_db)):
+    # 같은 이름+학년이 이미 있으면 병합 (중복 방지)
+    existing = db.query(models.Student).options(selectinload(models.Student.classes)).filter(
+        models.Student.name == data.name,
+        models.Student.grade == data.grade,
+    ).first()
+
+    if existing:
+        # 반 추가
+        if data.class_ids:
+            new_classes = db.query(models.Class).filter(models.Class.id.in_(data.class_ids)).all()
+            for cls in new_classes:
+                if cls not in existing.classes:
+                    existing.classes.append(cls)
+        # 선생님 병합 (쉼표 구분)
+        if data.teacher:
+            current = [t.strip() for t in (existing.teacher or "").split(",") if t.strip()]
+            for t in [t.strip() for t in data.teacher.split(",") if t.strip()]:
+                if t not in current:
+                    current.append(t)
+            existing.teacher = ",".join(current)
+        # 기타 필드 업데이트
+        if data.school and not existing.school:
+            existing.school = data.school
+        if data.phone and not existing.phone:
+            existing.phone = data.phone
+        db.commit()
+        db.refresh(existing)
+        return existing
+
     student = models.Student(
         name=data.name, grade=data.grade, school=data.school,
         phone=data.phone, teacher=data.teacher,

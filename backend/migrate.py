@@ -160,6 +160,58 @@ def _run_m2m_migration(conn):
         print("[migrate] SKIP  migrate_class_id_to_student_classes (class_id 컬럼 없음)")
 
 
+def _run_dedup_students(conn):
+    """동명이인(같은 이름+학년) 학생 레코드 병합 — 반/선생님 합치기"""
+    dupes = conn.execute(text("""
+        SELECT name, grade, MIN(id) AS keep_id, ARRAY_AGG(id ORDER BY id) AS all_ids
+        FROM students
+        GROUP BY name, grade
+        HAVING COUNT(*) > 1
+    """)).fetchall()
+
+    if not dupes:
+        print("[migrate] SKIP  dedup_students (중복 없음)")
+        return
+
+    for row in dupes:
+        name, grade, keep_id, all_ids = row
+        merge_ids = [i for i in all_ids if i != keep_id]
+        print(f"[migrate] OK    dedup '{name}'({grade}): {merge_ids} → {keep_id}")
+
+        for old_id in merge_ids:
+            # 반 이전
+            conn.execute(text("""
+                INSERT INTO student_classes (student_id, class_id)
+                SELECT :keep, class_id FROM student_classes WHERE student_id = :old
+                ON CONFLICT DO NOTHING
+            """), {"keep": keep_id, "old": old_id})
+
+            # 선생님 합치기 (쉼표 구분)
+            old_teacher = conn.execute(text(
+                "SELECT teacher FROM students WHERE id = :old"
+            ), {"old": old_id}).scalar()
+            if old_teacher:
+                keep_teacher = conn.execute(text(
+                    "SELECT teacher FROM students WHERE id = :keep"
+                ), {"keep": keep_id}).scalar() or ""
+                existing = [t.strip() for t in keep_teacher.split(",") if t.strip()]
+                for t in [t.strip() for t in old_teacher.split(",") if t.strip()]:
+                    if t not in existing:
+                        existing.append(t)
+                conn.execute(text(
+                    "UPDATE students SET teacher = :t WHERE id = :keep"
+                ), {"t": ",".join(existing), "keep": keep_id})
+
+            # 연관 데이터 이전
+            conn.execute(text("UPDATE test_results SET student_id=:keep WHERE student_id=:old"), {"keep": keep_id, "old": old_id})
+            conn.execute(text("UPDATE math_submissions SET student_id=:keep WHERE student_id=:old"), {"keep": keep_id, "old": old_id})
+            conn.execute(text("UPDATE word_tutoring_sessions SET student_id=:keep WHERE student_id=:old"), {"keep": keep_id, "old": old_id})
+            conn.execute(text("DELETE FROM student_classes WHERE student_id=:old"), {"old": old_id})
+            conn.execute(text("DELETE FROM students WHERE id=:old"), {"old": old_id})
+
+        conn.commit()
+
+
 def run():
     engine = create_engine(DATABASE_URL)
     print(f"[migrate] DB 연결: {DATABASE_URL}\n")
@@ -176,6 +228,7 @@ def run():
                 print(f"[migrate] OK    {name}")
 
         _run_m2m_migration(conn)
+        _run_dedup_students(conn)
 
     print("\n[migrate] 완료.")
 
