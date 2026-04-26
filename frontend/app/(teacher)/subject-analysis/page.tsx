@@ -198,13 +198,31 @@ export default function SubjectAnalysisPage() {
     <div className="space-y-8">
       <h1 className="text-xl font-bold text-gray-900 dark:text-gray-100">학생 세부 분석</h1>
 
-      <div>
+      <div className="flex items-center gap-3 flex-wrap">
         <select value={selectedId} onChange={(e) => setSelectedId(e.target.value)} className={selectCls + " w-64"}>
           <option value="">학생 선택...</option>
           {students.map((s) => (
             <option key={s.id} value={s.id}>{s.name} ({s.grade})</option>
           ))}
         </select>
+        {selectedId && !loading && (
+          <button
+            onClick={async () => {
+              const el = document.getElementById("subject-analysis-report");
+              if (!el) return;
+              const html2canvas = (await import("html2canvas")).default;
+              const student = students.find((s) => String(s.id) === selectedId);
+              const canvas = await html2canvas(el, { scale: 2, useCORS: true, backgroundColor: "#ffffff" });
+              const link = document.createElement("a");
+              link.download = `${student?.name ?? "학생"}_과목별분석.jpg`;
+              link.href = canvas.toDataURL("image/jpeg", 0.92);
+              link.click();
+            }}
+            className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors shadow-sm"
+          >
+            JPG로 저장
+          </button>
+        )}
       </div>
 
       {!selectedId && (
@@ -219,7 +237,7 @@ export default function SubjectAnalysisPage() {
 
       {/* 국어 → 영어 → 수학 → 과학 항상 표시 */}
       {selectedId && !loading && (
-        <div className="space-y-10">
+        <div id="subject-analysis-report" className="space-y-10">
           <MathSubjectSection subject="국어" subs={mathSubs.filter((s) => subjectMatch(s.test_title ?? "", "국어"))}
             color={{ line: "#7c3aed", badge: "text-violet-600 dark:text-violet-400", header: "bg-violet-600" }} />
           <MathSubjectSection subject="영어" subs={mathSubs.filter((s) => subjectMatch(s.test_title ?? "", "영어"))}
