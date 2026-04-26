@@ -360,12 +360,22 @@ def export_excel(word_test_id: Optional[int] = None, db: Session = Depends(get_d
 
 
 @router.get("")
-def list_submissions(word_test_id: Optional[int] = None, status: Optional[str] = None, db: Session = Depends(get_db)):
+def list_submissions(
+    word_test_id: Optional[int] = None,
+    status: Optional[str] = None,
+    student_name: Optional[str] = None,
+    grade: Optional[str] = None,
+    db: Session = Depends(get_db),
+):
     q = db.query(WordSubmission).options(joinedload(WordSubmission.word_test))
     if word_test_id:
         q = q.filter(WordSubmission.word_test_id == word_test_id)
     if status:
         q = q.filter(WordSubmission.status == status)
+    if student_name:
+        q = q.filter(WordSubmission.student_name == student_name)
+    if grade:
+        q = q.filter(WordSubmission.grade == grade)
     subs = q.order_by(WordSubmission.submitted_at.desc()).all()
     return [
         {
