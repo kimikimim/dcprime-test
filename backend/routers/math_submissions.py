@@ -411,6 +411,46 @@ def regrade_all(test_id: int, background_tasks: BackgroundTasks, db: Session = D
     return {"queued": count, "test_id": test_id}
 
 
+class AnswerCorrectIn(BaseModel):
+    answers: dict  # { "1": 3, "2": null, ... }  question_no → student_answer
+
+
+@router.patch("/{sub_id}/answers")
+def correct_answers(sub_id: int, body: AnswerCorrectIn, db: Session = Depends(get_db)):
+    """답안 수동 수정 후 점수 재계산"""
+    s = db.query(MathSubmission).filter(MathSubmission.id == sub_id).first()
+    if not s:
+        raise HTTPException(404, "Not found")
+    if not s.math_test:
+        raise HTTPException(400, "시험 정보 없음")
+
+    items_by_q = {i.question_no: i for i in s.items}
+    for qno_str, ans in body.answers.items():
+        qno = int(qno_str)
+        if qno not in items_by_q:
+            continue
+        item = items_by_q[qno]
+        val = int(ans) if ans is not None and str(ans).strip() not in ("", "0") else None
+        item.student_answer = val
+        item.is_correct = bool(val and val == item.correct_answer)
+
+    # 점수 재계산
+    pw = s.math_test.point_weights or {}
+    score = 0.0
+    total = 0.0
+    for item in s.items:
+        w = float(pw.get(str(item.question_no), 1)) if pw else 1.0
+        total += w
+        if item.is_correct:
+            score += w
+    s.score = score
+    s.total = total
+    s.status = "graded"
+    db.commit()
+    db.refresh(s)
+    return _build_out(s)
+
+
 class SubjectiveScoreIn(BaseModel):
     subjective_score: Optional[float] = None
 

@@ -48,6 +48,10 @@ export default function MathSubmissionsPage() {
   const [detail, setDetail] = useState<MathSubmissionDetail | null>(null);
   const [filterTest, setFilterTest] = useState("");
   const [subjectiveEdits, setSubjectiveEdits] = useState<Record<number, string>>({});
+  // 답안 수정 상태: { [question_no]: student_answer }
+  const [answerEdits, setAnswerEdits] = useState<Record<number, number | null>>({});
+  const [savingAnswers, setSavingAnswers] = useState(false);
+  const [answerSaveMsg, setAnswerSaveMsg] = useState<string | null>(null);
 
   const load = () => {
     apiFetch<MathTest[]>("/math-tests").then(setTests).catch(() => {});
@@ -82,11 +86,23 @@ export default function MathSubmissionsPage() {
   };
 
   const toggleExpand = async (s: MathSubmission) => {
-    if (expandedId === s.id) { setExpandedId(null); setDetail(null); return; }
+    if (expandedId === s.id) {
+      setExpandedId(null);
+      setDetail(null);
+      setAnswerEdits({});
+      setAnswerSaveMsg(null);
+      return;
+    }
     setExpandedId(s.id);
+    setAnswerEdits({});
+    setAnswerSaveMsg(null);
     try {
       const d = await apiFetch<MathSubmissionDetail>(`/math-submissions/${s.id}`);
       setDetail(d);
+      // 초기값으로 현재 student_answer 세팅
+      const init: Record<number, number | null> = {};
+      d.items.forEach((a) => { init[a.question_no] = a.student_answer; });
+      setAnswerEdits(init);
     } catch { setDetail(null); }
   };
 
@@ -99,7 +115,7 @@ export default function MathSubmissionsPage() {
         alert(e instanceof Error ? e.message : "삭제 실패");
       }
     }
-    if (expandedId === id) { setExpandedId(null); setDetail(null); }
+    if (expandedId === id) { setExpandedId(null); setDetail(null); setAnswerEdits({}); }
     load();
   };
 
@@ -114,6 +130,33 @@ export default function MathSubmissionsPage() {
     } catch { /* silent */ }
   };
 
+  const saveAnswers = async () => {
+    if (!detail) return;
+    setSavingAnswers(true);
+    setAnswerSaveMsg(null);
+    try {
+      // { "1": 3, "2": null, ... }
+      const payload: Record<string, number | null> = {};
+      Object.entries(answerEdits).forEach(([q, v]) => { payload[q] = v; });
+      const updated = await apiFetch<MathSubmission>(`/math-submissions/${detail.id}/answers`, {
+        method: "PATCH",
+        body: JSON.stringify({ answers: payload }),
+      });
+      // detail 갱신
+      const newDetail = await apiFetch<MathSubmissionDetail>(`/math-submissions/${detail.id}`);
+      setDetail(newDetail);
+      const init: Record<number, number | null> = {};
+      newDetail.items.forEach((a) => { init[a.question_no] = a.student_answer; });
+      setAnswerEdits(init);
+      setAnswerSaveMsg(`✓ 저장 완료 — ${updated.score}/${updated.total}점으로 재계산됨`);
+      load();
+    } catch (e: unknown) {
+      setAnswerSaveMsg("⚠ 저장 실패: " + (e instanceof Error ? e.message : "오류"));
+    } finally {
+      setSavingAnswers(false);
+    }
+  };
+
   const statusBadge = (status: MathSubmission["status"]) => {
     if (status === "graded") return <span className="text-xs bg-green-50 dark:bg-green-900/40 text-green-600 dark:text-green-400 px-2 py-0.5 rounded-full">채점완료</span>;
     if (status === "pending") return <span className="text-xs bg-amber-50 dark:bg-amber-900/40 text-amber-600 dark:text-amber-400 px-2 py-0.5 rounded-full">채점중</span>;
@@ -122,7 +165,7 @@ export default function MathSubmissionsPage() {
 
   return (
     <div>
-      <h1 className="text-xl font-bold mb-6 text-gray-900 dark:text-gray-100">수학 OMR 채점</h1>
+      <h1 className="text-xl font-bold mb-6 text-gray-900 dark:text-gray-100">과목별 OMR 채점</h1>
 
       {/* 업로드 폼 */}
       <form onSubmit={upload} className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl p-5 mb-6 shadow-sm">
@@ -214,19 +257,48 @@ export default function MathSubmissionsPage() {
             </div>
 
             {expandedId === s.id && detail && detail.id === s.id && (
-              <div className="border-t border-gray-200 dark:border-gray-700 px-5 py-4">
-                <div className="grid grid-cols-5 sm:grid-cols-10 gap-2">
-                  {detail.items.map((a) => (
-                    <div key={a.question_no} className={`flex flex-col items-center gap-1 p-2 rounded-lg ${a.is_correct ? "bg-green-50 dark:bg-green-900/30" : "bg-red-50 dark:bg-red-900/30"}`}>
-                      <span className="text-xs text-gray-400 dark:text-gray-500">{a.question_no}번</span>
-                      <span className={`font-bold text-base ${a.is_correct ? "text-green-600 dark:text-green-400" : "text-red-500 dark:text-red-400"}`}>
-                        {a.student_answer || "-"}
+              <div className="border-t border-gray-200 dark:border-gray-700 px-5 py-4 space-y-4">
+                {/* 답안 수정 그리드 */}
+                <div className="flex items-center justify-between mb-1">
+                  <span className="text-xs font-semibold text-gray-500 dark:text-gray-400">
+                    답안 확인 / 수정 <span className="font-normal text-gray-400">(틀린 문항은 빨간색)</span>
+                  </span>
+                  <div className="flex items-center gap-3">
+                    {answerSaveMsg && (
+                      <span className={`text-xs ${answerSaveMsg.startsWith("✓") ? "text-green-600 dark:text-green-400" : "text-red-500 dark:text-red-400"}`}>
+                        {answerSaveMsg}
                       </span>
-                      {!a.is_correct && (
+                    )}
+                    <button
+                      onClick={saveAnswers}
+                      disabled={savingAnswers}
+                      className="text-xs bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white px-3 py-1.5 rounded-lg transition-colors font-medium"
+                    >
+                      {savingAnswers ? "저장 중..." : "수정 저장 + 재채점"}
+                    </button>
+                  </div>
+                </div>
+                <div className="grid grid-cols-5 sm:grid-cols-10 gap-2">
+                  {detail.items.map((a) => {
+                    const editVal = answerEdits[a.question_no];
+                    const isCorrect = editVal != null && editVal > 0 && editVal === a.correct_answer;
+                    return (
+                      <div key={a.question_no} className={`flex flex-col items-center gap-1 p-2 rounded-lg border ${isCorrect ? "bg-green-50 dark:bg-green-900/30 border-green-200 dark:border-green-800" : "bg-red-50 dark:bg-red-900/30 border-red-200 dark:border-red-800"}`}>
+                        <span className="text-xs text-gray-400 dark:text-gray-500">{a.question_no}번</span>
+                        <select
+                          value={editVal ?? 0}
+                          onChange={(e) => setAnswerEdits({ ...answerEdits, [a.question_no]: Number(e.target.value) || null })}
+                          className={`text-sm font-bold w-full text-center rounded px-1 py-0.5 border-0 focus:outline-none focus:ring-1 focus:ring-indigo-400 ${isCorrect ? "bg-green-100 dark:bg-green-900/50 text-green-700 dark:text-green-300" : "bg-red-100 dark:bg-red-900/50 text-red-600 dark:text-red-400"}`}
+                        >
+                          <option value={0}>-</option>
+                          {[1, 2, 3, 4, 5].map((n) => (
+                            <option key={n} value={n}>{n}</option>
+                          ))}
+                        </select>
                         <span className="text-xs text-gray-400 dark:text-gray-500">정답:{a.correct_answer}</span>
-                      )}
-                    </div>
-                  ))}
+                      </div>
+                    );
+                  })}
                 </div>
               </div>
             )}
