@@ -36,6 +36,8 @@ export default function MathTestsPage() {
   const [tips, setTips] = useState<Record<number, string>>({});
   const [pointWeights, setPointWeights] = useState<Record<number, string>>({});
   const [savingWeights, setSavingWeights] = useState(false);
+  const [expandedSubjMax, setExpandedSubjMax] = useState<string>("");
+  const [savingSubjMax, setSavingSubjMax] = useState(false);
 
   const load = () => {
     apiFetch<MathTest[]>("/math-tests").then(setTests).catch(() => {});
@@ -57,9 +59,10 @@ export default function MathTestsPage() {
   };
 
   const toggleExpand = async (t: MathTest) => {
-    if (expandedId === t.id) { setExpandedId(null); setAnswers([]); setTags({}); setTips({}); setPointWeights({}); setAnalyzeMsg(null); return; }
+    if (expandedId === t.id) { setExpandedId(null); setAnswers([]); setTags({}); setTips({}); setPointWeights({}); setAnalyzeMsg(null); setExpandedSubjMax(""); return; }
     setExpandedId(t.id);
     setAnalyzeMsg(null);
+    setExpandedSubjMax(t.subjective_max != null ? String(t.subjective_max) : "");
     try {
       const d = await apiFetch<{ answers: number[] }>(`/math-tests/${t.id}/answers`);
       setAnswers(d.answers.length > 0 ? d.answers : Array(t.num_questions).fill(0));
@@ -143,6 +146,26 @@ export default function MathTestsPage() {
       alert(e instanceof Error ? e.message : "태그 저장 실패");
     } finally {
       setSavingTags(false);
+    }
+  };
+
+  const saveSubjMax = async () => {
+    if (!expandedId) return;
+    setSavingSubjMax(true);
+    try {
+      const test = tests.find((t) => t.id === expandedId);
+      if (!test) return;
+      const payload = {
+        title: test.title, grade: test.grade, test_date: test.test_date,
+        num_questions: test.num_questions,
+        subjective_max: expandedSubjMax.trim() ? parseFloat(expandedSubjMax) : null,
+      };
+      await apiFetch(`/math-tests/${expandedId}`, { method: "PUT", body: JSON.stringify(payload) });
+      load();
+    } catch (e: unknown) {
+      alert(e instanceof Error ? e.message : "저장 실패");
+    } finally {
+      setSavingSubjMax(false);
     }
   };
 
@@ -235,7 +258,7 @@ export default function MathTestsPage() {
 
   return (
     <div>
-      <h1 className="text-xl font-bold mb-6 text-gray-900 dark:text-gray-100">수학시험 관리</h1>
+      <h1 className="text-xl font-bold mb-6 text-gray-900 dark:text-gray-100">과목시험 관리</h1>
 
       {/* 시험 생성 폼 */}
       <form onSubmit={submit} className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl p-5 mb-6 flex flex-wrap gap-3 items-end shadow-sm">
@@ -348,13 +371,42 @@ export default function MathTestsPage() {
             {/* 정답 + 태그 등록 */}
             {expandedId === t.id && (
               <div className="border-t border-gray-200 dark:border-gray-700 px-5 py-4 space-y-5">
+
+                {/* ── 서술형 만점 설정 ── */}
+                <div className="bg-pink-50 dark:bg-pink-900/20 border border-pink-200 dark:border-pink-700/50 rounded-xl p-4">
+                  <div className="flex items-center gap-4 flex-wrap">
+                    <span className="text-sm font-semibold text-pink-700 dark:text-pink-400">서술형 만점 설정</span>
+                    <span className="text-xs text-pink-400 dark:text-pink-500">비워두면 객관식 전용 (서술형 없음)</span>
+                    <div className="flex items-center gap-2 ml-auto">
+                      <input
+                        type="number"
+                        min={0}
+                        step={0.5}
+                        value={expandedSubjMax}
+                        onChange={(e) => setExpandedSubjMax(e.target.value)}
+                        placeholder="예: 20"
+                        className="border border-pink-300 dark:border-pink-600 rounded-lg px-3 py-1.5 text-sm w-24 text-center bg-white dark:bg-gray-700 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-pink-400"
+                      />
+                      <span className="text-sm text-pink-600 dark:text-pink-400 font-medium">점</span>
+                      <button onClick={saveSubjMax} disabled={savingSubjMax}
+                        className="text-xs bg-pink-600 hover:bg-pink-700 text-white px-3 py-1.5 rounded-lg disabled:opacity-50 transition-colors font-medium">
+                        {savingSubjMax ? "저장 중..." : "저장"}
+                      </button>
+                      {t.subjective_max != null && (
+                        <span className="text-xs text-pink-500 dark:text-pink-400">현재: {t.subjective_max}점</span>
+                      )}
+                    </div>
+                  </div>
+                </div>
+
                 {/* 정답 + 배점 입력 */}
                 <div>
                   <div className="flex justify-between items-center mb-3">
                     <div className="flex items-center gap-3">
                       <span className="text-sm font-semibold text-gray-700 dark:text-gray-300">정답 입력 (1~5)</span>
                       <span className="text-xs text-gray-400 dark:text-gray-500">
-                        배점 합계: {answers.map((_, idx) => parseFloat(pointWeights[idx + 1] || "0") || 0).reduce((a, b) => a + b, 0).toFixed(1)}점
+                        객관식 배점 합계: {answers.map((_, idx) => parseFloat(pointWeights[idx + 1] || "0") || 0).reduce((a, b) => a + b, 0).toFixed(1)}점
+                        {t.subjective_max != null && ` + 서술형 ${t.subjective_max}점 = 총 ${(answers.map((_, idx) => parseFloat(pointWeights[idx + 1] || "0") || 0).reduce((a, b) => a + b, 0) + t.subjective_max).toFixed(1)}점`}
                       </span>
                     </div>
                     <div className="flex gap-2">
