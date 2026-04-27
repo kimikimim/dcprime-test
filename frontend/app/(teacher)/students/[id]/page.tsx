@@ -258,10 +258,10 @@ export default function StudentProfilePage() {
         )}
       </div>
 
-      {/* 수학 성적 */}
+      {/* 과목시험 성적 */}
       <div className={card}>
         <div className="flex items-center justify-between mb-4">
-          <h2 className="font-semibold text-gray-800 dark:text-gray-200">수학 성적</h2>
+          <h2 className="font-semibold text-gray-800 dark:text-gray-200">과목시험 성적</h2>
           <span className="text-xs text-gray-400 dark:text-gray-500">채점 완료 기준</span>
         </div>
         {(profile.math_results ?? []).length > 0 ? (
@@ -305,7 +305,7 @@ export default function StudentProfilePage() {
             </table>
           </div>
         ) : (
-          <p className="text-gray-400 dark:text-gray-500 text-sm">수학 성적 없음</p>
+          <p className="text-gray-400 dark:text-gray-500 text-sm">과목시험 성적 없음</p>
         )}
       </div>
 
