@@ -20,7 +20,7 @@ const wordCards = [
 
 const mathCards = [
   { href: "/math-tests", label: "시험 관리", desc: "국/영/수/과 시험 생성 및 정답 등록", icon: "📐" },
-  { href: "/math-submissions", label: "OMR 채점", desc: "OMR 답안지 업로드 및 결과 조회", icon: "📋" },
+  { href: "/subject-submissions", label: "OMR 채점", desc: "OMR 답안지 업로드 및 결과 조회", icon: "📋" },
   { href: "/math-bulk-grade", label: "반별 채점", desc: "반 전체 답안지 일괄 채점", icon: "📊" },
 ];
 

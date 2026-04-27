@@ -38,7 +38,7 @@ const menus: Menu[] = [
         groupLabel: "관리",
         items: [
           { href: "/math-tests", label: "시험 관리" },
-          { href: "/math-submissions", label: "OMR 채점" },
+          { href: "/subject-submissions", label: "OMR 채점" },
           { href: "/math-bulk-grade", label: "반별 채점" },
         ],
       },
