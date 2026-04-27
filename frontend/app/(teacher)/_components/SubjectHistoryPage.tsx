@@ -518,7 +518,19 @@ function SubjectHistoryContent({ subject }: { subject: Subject }) {
                     const el = document.getElementById("individual-report");
                     if (!el) return;
                     const html2canvas = (await import("html2canvas")).default;
-                    const canvas = await html2canvas(el, { scale: 2, useCORS: true, backgroundColor: "#ffffff" });
+                    const canvas = await html2canvas(el, {
+                      scale: 2, useCORS: true, backgroundColor: "#ffffff",
+                      onclone: (_d, clonedEl) => {
+                        (clonedEl as HTMLElement).querySelectorAll<HTMLElement>("*").forEach((node) => {
+                          const cs = window.getComputedStyle(node);
+                          const bg = cs.backgroundColor;
+                          const fg = cs.color;
+                          if (bg && bg !== "rgba(0, 0, 0, 0)" && bg !== "transparent") node.style.backgroundColor = bg;
+                          if (fg) node.style.color = fg;
+                          node.style.borderColor = cs.borderTopColor;
+                        });
+                      },
+                    });
                     const link = document.createElement("a");
                     link.download = `${selected.name}_${subject}성적분석.jpg`;
                     link.href = canvas.toDataURL("image/jpeg", 0.92);

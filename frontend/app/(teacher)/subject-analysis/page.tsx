@@ -212,7 +212,24 @@ export default function SubjectAnalysisPage() {
               if (!el) return;
               const html2canvas = (await import("html2canvas")).default;
               const student = students.find((s) => String(s.id) === selectedId);
-              const canvas = await html2canvas(el, { scale: 2, useCORS: true, backgroundColor: "#ffffff" });
+              const canvas = await html2canvas(el, {
+                scale: 2,
+                useCORS: true,
+                backgroundColor: "#ffffff",
+                onclone: (_doc, clonedEl) => {
+                  // html2canvas v1은 oklch()/lab() 색상 파싱 불가 → computed style을 inline으로 미리 주입
+                  (clonedEl as HTMLElement).querySelectorAll<HTMLElement>("*").forEach((node) => {
+                    const cs = window.getComputedStyle(node);
+                    const bg = cs.backgroundColor;
+                    const fg = cs.color;
+                    const bc = cs.borderTopColor;
+                    if (bg && bg !== "rgba(0, 0, 0, 0)" && bg !== "transparent")
+                      node.style.backgroundColor = bg;
+                    if (fg) node.style.color = fg;
+                    if (bc) node.style.borderColor = bc;
+                  });
+                },
+              });
               const link = document.createElement("a");
               link.download = `${student?.name ?? "학생"}_과목별분석.jpg`;
               link.href = canvas.toDataURL("image/jpeg", 0.92);
