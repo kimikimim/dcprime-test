@@ -8,6 +8,7 @@ from typing import List, Optional
 from database import get_db
 import models
 from models import MathSubmission
+from routers.math_submissions import _calc_objective_points
 
 router = APIRouter(prefix="/students", tags=["students"])
 
@@ -240,17 +241,23 @@ def get_student_profile(student_id: int, db: Session = Depends(get_db)):
 
     math_list = []
     for ms in math_subs:
-        # 반 평균/석차 계산
+        obj_pts, obj_total = _calc_objective_points(ms)
+        my_pct = round(obj_pts / obj_total * 100, 1) if obj_total else None
+
+        # 반 평균/석차 계산 (배점 적용)
         all_subs = db.query(MathSubmission).filter(
             MathSubmission.math_test_id == ms.math_test_id,
             MathSubmission.status == "graded",
             MathSubmission.score.isnot(None),
             MathSubmission.total.isnot(None),
         ).all()
-        scores = [(s.student_id, round(s.score / s.total * 100, 1)) for s in all_subs if s.total]
-        avg = round(sum(p for _, p in scores) / len(scores), 1) if scores else None
-        my_pct = round(ms.score / ms.total * 100, 1) if ms.total else None
-        rank = sum(1 for _, p in scores if p > my_pct) + 1 if my_pct is not None and scores else None
+        peer_scores = []
+        for s in all_subs:
+            p_pts, p_tot = _calc_objective_points(s)
+            if p_tot and p_tot > 0:
+                peer_scores.append((s.student_id, round(p_pts / p_tot * 100, 1)))
+        avg = round(sum(p for _, p in peer_scores) / len(peer_scores), 1) if peer_scores else None
+        rank = sum(1 for _, p in peer_scores if p > my_pct) + 1 if my_pct is not None and peer_scores else None
 
         math_list.append({
             "id": ms.id,
@@ -258,10 +265,12 @@ def get_student_profile(student_id: int, db: Session = Depends(get_db)):
             "test_date": str(ms.math_test.test_date) if ms.math_test else None,
             "score": ms.score,
             "total": ms.total,
+            "objective_points": obj_pts,
+            "objective_total": obj_total,
             "score_pct": my_pct,
             "class_avg": avg,
             "class_rank": rank,
-            "class_total": len(scores),
+            "class_total": len(peer_scores),
             "subjective_score": float(ms.subjective_score) if ms.subjective_score is not None else None,
             "subjective_max": float(ms.math_test.subjective_max) if ms.math_test and ms.math_test.subjective_max is not None else None,
         })

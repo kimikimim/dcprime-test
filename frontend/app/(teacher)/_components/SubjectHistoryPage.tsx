@@ -19,6 +19,8 @@ interface MathSubmissionDetail {
   test_date: string;
   score: number;
   total: number;
+  objective_points: number | null;
+  objective_total: number | null;
   subjective_score: number | null;
   subjective_max: number | null;
   status: string;
@@ -38,26 +40,32 @@ interface MathSubmissionDetail {
 
 export type Subject = "수학" | "국어" | "영어" | "과학";
 
-// 서술형이 있을 때 실질 점수 퍼센트 계산
-function calcTotalPct(score: number, total: number, subjective_score: number | null, subjective_max: number | null) {
-  if (subjective_max != null && subjective_max > 0) {
-    return Math.round(((score + (subjective_score ?? 0)) / (total + subjective_max)) * 100);
-  }
-  return Math.round((score / total) * 100);
+// objective_points 우선 사용 (배점 적용 점수), 없으면 score 폴백
+function objPts(s: { score: number; total: number; objective_points: number | null; objective_total: number | null }) {
+  return { pts: s.objective_points ?? s.score, tot: s.objective_total ?? s.total };
 }
 
-// 점수 셀 텍스트 (서술형 포함 시 상세 형식)
+// 서술형 포함 퍼센트 계산
+function calcTotalPct(s: MathSubmissionDetail) {
+  const { pts, tot } = objPts(s);
+  if (s.subjective_max != null && s.subjective_max > 0) {
+    return Math.round(((pts + (s.subjective_score ?? 0)) / (tot + s.subjective_max)) * 100);
+  }
+  return tot > 0 ? Math.round((pts / tot) * 100) : 0;
+}
+
+// 점수 셀 텍스트 (배점 + 서술형 포함 형식)
 function formatScoreCell(s: MathSubmissionDetail) {
-  if (s.score == null || s.total == null) return "-";
-  if (!s.subjective_max) return `${s.score}/${s.total}`;
+  const { pts, tot } = objPts(s);
+  if (!s.subjective_max) return `${pts}/${tot}`;
   const sub = s.subjective_score ?? 0;
-  const total = s.score + sub;
+  const total = pts + sub;
   if (s.items && s.items.length > 0) {
     const correct = s.items.filter(i => i.is_correct).length;
     const n = s.items.length;
-    return `객관식 ${correct}/${n}문항(${s.score}점) + 서술형 ${sub}점 = 합계 ${total}점`;
+    return `객관식 ${correct}/${n}문항(${pts}점) + 서술형 ${sub}점 = 합계 ${total}점`;
   }
-  return `객관식 ${s.score}점 + 서술형 ${sub}점 = 합계 ${total}점`;
+  return `객관식 ${pts}점 + 서술형 ${sub}점 = 합계 ${total}점`;
 }
 
 export function subjectMatch(title: string, subject: Subject) {
@@ -109,7 +117,7 @@ function SubjectHistoryContent({ subject }: { subject: Subject }) {
 
   // 성적 추이 데이터
   const trendData = graded.map((s) => {
-    const pct = calcTotalPct(s.score, s.total, s.subjective_score, s.subjective_max);
+    const pct = calcTotalPct(s);
     const classAvgPct = s.class_avg != null ? Math.round(s.class_avg) : null;
     return {
       name: (s.test_title ?? "").length > 8 ? (s.test_title ?? "").slice(0, 8) + "…" : (s.test_title ?? ""),
@@ -156,7 +164,7 @@ function SubjectHistoryContent({ subject }: { subject: Subject }) {
 
   // 반별 뷰 계산
   const classGraded = classSubmissions;
-  const classPct = (r: MathSubmissionDetail) => calcTotalPct(r.score, r.total, r.subjective_score, r.subjective_max);
+  const classPct = (r: MathSubmissionDetail) => calcTotalPct(r);
   const classAvgPct = classGraded.length > 0
     ? Math.round(classGraded.reduce((s, r) => s + classPct(r), 0) / classGraded.length)
     : null;
@@ -195,7 +203,8 @@ function SubjectHistoryContent({ subject }: { subject: Subject }) {
 
   // 개별 리포트 HTML
   const buildReportHtml = (s: MathSubmissionDetail, rank: number, total: number, avgPct: number | null) => {
-    const pct = calcTotalPct(s.score, s.total, s.subjective_score, s.subjective_max);
+    const { pts: oPts, tot: oTot } = objPts(s);
+    const pct = calcTotalPct(s);
     const diffVal = avgPct != null ? pct - avgPct : null;
     const wrong = s.items?.filter((i) => !i.is_correct).map((i) => i.question_no).sort((a, b) => a - b) ?? [];
     const today = new Date().toLocaleDateString("ko-KR");
@@ -271,13 +280,13 @@ function SubjectHistoryContent({ subject }: { subject: Subject }) {
   <div class="section-title">성적 분석</div>
   ${s.subjective_max != null ? `
   <div style="background:#fdf4ff;border:1px solid #e9d5ff;border-radius:8px;padding:12px 16px;margin-bottom:12px;font-size:14px;color:#374151;">
-    <span style="font-weight:600;">객관식</span> ${s.items ? `${s.items.filter((i:{is_correct:boolean})=>i.is_correct).length}/${s.items.length}문항` : ""}(${s.score}점)
+    <span style="font-weight:600;">객관식</span> ${s.items ? `${s.items.filter((i:{is_correct:boolean})=>i.is_correct).length}/${s.items.length}문항` : ""}(${oPts}점)
     &nbsp;+&nbsp;<span style="font-weight:600;">서술형</span> ${s.subjective_score ?? 0}점
-    &nbsp;=&nbsp;<span style="font-weight:700;color:#7c3aed;">합계 ${s.score + (s.subjective_score ?? 0)}점</span>
-    <span style="color:#9ca3af;font-size:12px;margin-left:8px;">(객관식 만점 ${s.total}점 + 서술형 만점 ${s.subjective_max}점)</span>
+    &nbsp;=&nbsp;<span style="font-weight:700;color:#7c3aed;">합계 ${oPts + (s.subjective_score ?? 0)}점</span>
+    <span style="color:#9ca3af;font-size:12px;margin-left:8px;">(객관식 만점 ${oTot}점 + 서술형 만점 ${s.subjective_max}점)</span>
   </div>` : ""}
   <div class="score-grid">
-    <div class="score-card"><div class="label">점수</div><div class="value blue">${s.score + (s.subjective_max != null ? (s.subjective_score ?? 0) : 0)}<span style="font-size:14px;font-weight:400">/${s.total + (s.subjective_max ?? 0)}점</span></div></div>
+    <div class="score-card"><div class="label">점수</div><div class="value blue">${oPts + (s.subjective_max != null ? (s.subjective_score ?? 0) : 0)}<span style="font-size:14px;font-weight:400">/${oTot + (s.subjective_max ?? 0)}점</span></div></div>
     <div class="score-card"><div class="label">정답률</div><div class="value ${pct >= 80 ? "green" : pct >= 60 ? "orange" : "red"}">${pct}%</div></div>
     <div class="score-card"><div class="label">반 평균</div><div class="value orange">${avgPct != null ? avgPct + "%" : "-"}</div></div>
     <div class="score-card"><div class="label">석차</div><div class="value blue">${rank}<span style="font-size:14px;font-weight:400">/${total}등</span></div></div>
@@ -651,11 +660,12 @@ function SubjectHistoryContent({ subject }: { subject: Subject }) {
                         </thead>
                         <tbody>
                           {graded.map((s) => {
-                            const pct = calcTotalPct(s.score, s.total, s.subjective_score, s.subjective_max);
+                            const pct = calcTotalPct(s);
+                            const { pts: sPts, tot: sTot } = objPts(s);
                             const avg = s.class_avg != null ? Math.round(s.class_avg) : null;
                             const d = avg != null ? pct - avg : null;
-                            const totalScore = s.score + (s.subjective_max != null ? (s.subjective_score ?? 0) : 0);
-                            const maxScore = s.total + (s.subjective_max ?? 0);
+                            const totalScore = sPts + (s.subjective_max != null ? (s.subjective_score ?? 0) : 0);
+                            const maxScore = sTot + (s.subjective_max ?? 0);
                             return (
                               <tr key={s.id} style={{ borderBottom: "1px solid #e5e7eb" }}>
                                 <td style={{ padding: "8px", color: "#374151", fontWeight: "500", textAlign: "left" }}>{s.test_title}</td>

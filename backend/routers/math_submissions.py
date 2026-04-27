@@ -38,6 +38,8 @@ class MathSubmissionOut(BaseModel):
     status: str
     score: Optional[float]
     total: Optional[float]
+    objective_points: Optional[float] = None   # 배점 적용 객관식 득점
+    objective_total: Optional[float] = None    # 배점 적용 객관식 만점
     subjective_score: Optional[float] = None
     subjective_max: Optional[float] = None
     submitted_at: str
@@ -50,7 +52,23 @@ class MathSubmissionDetailOut(MathSubmissionOut):
     items: List[SubmissionItemOut]
 
 
+def _calc_objective_points(s: MathSubmission):
+    """
+    point_weights가 있으면 맞은 문항의 배점 합(가중 점수)을 반환.
+    없으면 저장된 score/total 그대로 반환.
+    """
+    pw = (s.math_test.point_weights or {}) if s.math_test else {}
+    if pw and s.items:
+        obj_pts   = round(sum(float(pw.get(str(i.question_no), 0)) for i in s.items if i.is_correct), 2)
+        obj_total = round(sum(float(pw.get(str(i.question_no), 0)) for i in s.items), 2)
+        return obj_pts, obj_total
+    # 배점 없으면 stored score/total 사용
+    return (float(s.score) if s.score is not None else None,
+            float(s.total) if s.total is not None else None)
+
+
 def _build_out(s: MathSubmission, class_avg=None, class_rank=None, class_total=None) -> dict:
+    obj_pts, obj_total = _calc_objective_points(s)
     return {
         "id": s.id,
         "math_test_id": s.math_test_id,
@@ -61,6 +79,8 @@ def _build_out(s: MathSubmission, class_avg=None, class_rank=None, class_total=N
         "status": s.status,
         "score": s.score,
         "total": s.total,
+        "objective_points": obj_pts,
+        "objective_total": obj_total,
         "subjective_score": float(s.subjective_score) if s.subjective_score is not None else None,
         "subjective_max": float(s.math_test.subjective_max) if s.math_test and s.math_test.subjective_max is not None else None,
         "submitted_at": str(s.submitted_at),
@@ -71,7 +91,7 @@ def _build_out(s: MathSubmission, class_avg=None, class_rank=None, class_total=N
 
 
 def _calc_class_stats(db: Session, math_test_id: int, student_id: int):
-    """같은 시험의 모든 채점 완료 제출에서 반 평균·석차 계산"""
+    """같은 시험의 모든 채점 완료 제출에서 반 평균·석차 계산 (배점 적용)"""
     subs = db.query(MathSubmission).filter(
         MathSubmission.math_test_id == math_test_id,
         MathSubmission.status == "graded",
@@ -80,7 +100,11 @@ def _calc_class_stats(db: Session, math_test_id: int, student_id: int):
     ).all()
     if not subs:
         return None, None, len(subs)
-    scores = [(s.student_id, s.score / s.total * 100) for s in subs if s.total and s.total > 0]
+    scores = []
+    for s in subs:
+        obj_pts, obj_total = _calc_objective_points(s)
+        if obj_total and obj_total > 0:
+            scores.append((s.student_id, round(obj_pts / obj_total * 100, 1)))
     if not scores:
         return None, None, 0
     avg = sum(pct for _, pct in scores) / len(scores)

@@ -13,6 +13,7 @@ interface StudentItem { id: number; name: string; grade: string; }
 interface MathSub {
   id: number; test_title: string; test_date: string | null;
   status: string; score: number | null; total: number | null;
+  objective_points: number | null; objective_total: number | null;
   subjective_score: number | null; subjective_max: number | null;
   class_avg: number | null; class_rank: number | null; class_total: number | null;
   items?: { question_no: number; is_correct: boolean; tag: string | null }[];
@@ -23,23 +24,28 @@ const card = "bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-
 
 function shorten(s: string) { return s.length > 10 ? s.slice(0, 10) + "…" : s; }
 
-function calcTotalPct(score: number, total: number, sub_score: number | null, sub_max: number | null) {
-  if (sub_max != null && sub_max > 0)
-    return Math.round(((score + (sub_score ?? 0)) / (total + sub_max)) * 100);
-  return Math.round((score / total) * 100);
+function oPts(s: MathSub) {
+  return { pts: s.objective_points ?? s.score ?? 0, tot: s.objective_total ?? s.total ?? 0 };
+}
+
+function calcTotalPct(s: MathSub) {
+  const { pts, tot } = oPts(s);
+  if (s.subjective_max != null && s.subjective_max > 0)
+    return Math.round(((pts + (s.subjective_score ?? 0)) / (tot + s.subjective_max)) * 100);
+  return tot > 0 ? Math.round((pts / tot) * 100) : 0;
 }
 
 function formatScoreCell(s: MathSub) {
-  if (s.score == null || s.total == null) return "-";
-  if (!s.subjective_max) return `${s.score}/${s.total}`;
+  const { pts, tot } = oPts(s);
+  if (!s.subjective_max) return `${pts}/${tot}`;
   const sub = s.subjective_score ?? 0;
-  const tot = s.score + sub;
+  const total = pts + sub;
   if (s.items && s.items.length > 0) {
     const correct = s.items.filter(i => i.is_correct).length;
     const n = s.items.length;
-    return `객관식 ${correct}/${n}문항(${s.score}점) + 서술형 ${sub}점 = 합계 ${tot}점`;
+    return `객관식 ${correct}/${n}문항(${pts}점) + 서술형 ${sub}점 = 합계 ${total}점`;
   }
-  return `객관식 ${s.score}점 + 서술형 ${sub}점 = 합계 ${tot}점`;
+  return `객관식 ${pts}점 + 서술형 ${sub}점 = 합계 ${total}점`;
 }
 
 const SECTION_HEADER = "flex items-center gap-2 mb-4";
@@ -71,15 +77,18 @@ function MathSubjectSection({ subject, subs, color }: {
     );
   }
 
-  const chartData = subs.map((s) => ({
-    name: shorten(s.test_title ?? ""),
-    fullName: s.test_title,
-    pct: s.score != null && s.total ? calcTotalPct(s.score, s.total, s.subjective_score, s.subjective_max) : 0,
-    avgPct: s.class_avg != null ? Math.round(s.class_avg) : null,
-    score: s.score, total: s.total,
-    subjective_score: s.subjective_score, subjective_max: s.subjective_max,
-    rank: s.class_rank, rankTotal: s.class_total,
-  }));
+  const chartData = subs.map((s) => {
+    const { pts, tot } = oPts(s);
+    return {
+      name: shorten(s.test_title ?? ""),
+      fullName: s.test_title,
+      pct: calcTotalPct(s),
+      avgPct: s.class_avg != null ? Math.round(s.class_avg) : null,
+      score: pts, total: tot,
+      subjective_score: s.subjective_score, subjective_max: s.subjective_max,
+      rank: s.class_rank, rankTotal: s.class_total,
+    };
+  });
 
   const avg = Math.round(chartData.reduce((a, d) => a + d.pct, 0) / chartData.length);
   const latest = chartData[chartData.length - 1];
@@ -173,7 +182,7 @@ function MathSubjectSection({ subject, subs, color }: {
           </thead>
           <tbody className="divide-y divide-gray-100 dark:divide-gray-700">
             {subs.map((s) => {
-              const pct = s.score != null && s.total ? calcTotalPct(s.score, s.total, s.subjective_score, s.subjective_max) : null;
+              const pct = s.score != null && s.total ? calcTotalPct(s) : null;
               const avgPct = s.class_avg != null ? Math.round(s.class_avg) : null;
               const d = pct != null && avgPct != null ? pct - avgPct : null;
               return (

@@ -274,16 +274,18 @@ export default function StudentProfilePage() {
               </thead>
               <tbody className="divide-y divide-gray-100 dark:divide-gray-700">
                 {(profile.math_results ?? []).map((r) => {
-                  const effPct = r.score != null && r.total != null
+                  const rPts = r.objective_points ?? r.score ?? 0;
+                  const rTot = r.objective_total ?? r.total ?? 0;
+                  const effPct = rTot > 0
                     ? (r.subjective_max != null && r.subjective_max > 0
-                        ? Math.round(((r.score + (r.subjective_score ?? 0)) / (r.total + r.subjective_max)) * 100)
-                        : r.score_pct != null ? Math.round(r.score_pct) : null)
+                        ? Math.round(((rPts + (r.subjective_score ?? 0)) / (rTot + r.subjective_max)) * 100)
+                        : Math.round((rPts / rTot) * 100))
                     : null;
                   const diff = effPct != null && r.class_avg != null ? Math.round(effPct - r.class_avg) : null;
-                  const scoreDisplay = r.score != null && r.total != null
+                  const scoreDisplay = rTot > 0
                     ? (r.subjective_max != null
-                        ? `객관식 ${r.score}pt + 서술형 ${r.subjective_score ?? 0}pt = ${r.score + (r.subjective_score ?? 0)}pt`
-                        : `${r.score}/${r.total}`)
+                        ? `객관식 ${rPts}pt + 서술형 ${r.subjective_score ?? 0}pt = ${rPts + (r.subjective_score ?? 0)}pt`
+                        : `${rPts}/${rTot}`)
                     : "-";
                   return (
                     <tr key={r.id} className="hover:bg-gray-50 dark:hover:bg-gray-700/50">
