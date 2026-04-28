@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useState, useRef } from "react";
+import { useEffect, useState } from "react";
 import { apiFetch } from "@/lib/api";
 
 const GRADES = ["초1","초2","초3","초4","초5","초6","중1","중2","중3","고1","고2","고3"];
@@ -31,10 +31,6 @@ export default function MathTestsPage() {
   const [editingMeta, setEditingMeta] = useState<number | null>(null);
   const [metaForm, setMetaForm] = useState({ title: "", grade: "중1", test_date: "", num_questions: 20, subjective_max: "" });
   const [savingMeta, setSavingMeta] = useState(false);
-  const [analyzingPaper, setAnalyzingPaper] = useState(false);
-  const [analyzeMsg, setAnalyzeMsg] = useState<{ type: "success" | "error"; text: string } | null>(null);
-  const paperInputRef = useRef<HTMLInputElement>(null);
-  const [tips, setTips] = useState<Record<number, string>>({});
   const [pointWeights, setPointWeights] = useState<Record<number, string>>({});
   const [savingWeights, setSavingWeights] = useState(false);
   const [expandedSubjMax, setExpandedSubjMax] = useState<string>("");
@@ -62,9 +58,8 @@ export default function MathTestsPage() {
   };
 
   const toggleExpand = async (t: MathTest) => {
-    if (expandedId === t.id) { setExpandedId(null); setAnswers([]); setTags({}); setTips({}); setPointWeights({}); setAnalyzeMsg(null); setExpandedSubjMax(""); setTendency(""); return; }
+    if (expandedId === t.id) { setExpandedId(null); setAnswers([]); setTags({}); setPointWeights({}); setExpandedSubjMax(""); setTendency(""); return; }
     setExpandedId(t.id);
-    setAnalyzeMsg(null);
     setExpandedSubjMax(t.subjective_max != null ? String(t.subjective_max) : "");
     setTendency(t.tendency ?? "");
     try {
@@ -83,17 +78,6 @@ export default function MathTestsPage() {
       setTags(numericTags);
     } catch {
       setTags({});
-    }
-    // tips 로드
-    try {
-      const tipsData = await apiFetch<{ tips: Record<string, string> }>(`/math-tests/${t.id}/tips`);
-      const numericTips: Record<number, string> = {};
-      for (const [k, v] of Object.entries(tipsData.tips || {})) {
-        numericTips[Number(k)] = v;
-      }
-      setTips(numericTips);
-    } catch {
-      setTips({});
     }
     // 배점 로드
     try {
@@ -135,15 +119,6 @@ export default function MathTestsPage() {
       await apiFetch(`/math-tests/${expandedId}/tags`, {
         method: "PUT",
         body: JSON.stringify({ tags: strTags }),
-      });
-      // tips도 같이 저장
-      const strTips: Record<string, string> = {};
-      for (const [k, v] of Object.entries(tips)) {
-        if (v.trim()) strTips[String(k)] = v.trim();
-      }
-      await apiFetch(`/math-tests/${expandedId}/tips`, {
-        method: "PUT",
-        body: JSON.stringify({ tips: strTips }),
       });
       load();
     } catch (e: unknown) {
@@ -207,40 +182,6 @@ export default function MathTestsPage() {
       alert(e instanceof Error ? e.message : "배점 저장 실패");
     } finally {
       setSavingWeights(false);
-    }
-  };
-
-  const analyzePaper = async (testId: number) => {
-    const file = paperInputRef.current?.files?.[0];
-    if (!file) return;
-    setAnalyzingPaper(true);
-    setAnalyzeMsg(null);
-    try {
-      const formData = new FormData();
-      formData.append("paper", file);
-      const BASE = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
-      const { apiHeaders } = await import("@/lib/api");
-      const res = await fetch(`${BASE}/api/math-tests/${testId}/analyze-paper`, {
-        method: "POST",
-        body: formData,
-        headers: apiHeaders(),
-      });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.detail ?? "분석 실패");
-      // 태그 자동 채우기
-      const numericTags: Record<number, string> = {};
-      for (const [k, v] of Object.entries(data.tags || {})) numericTags[Number(k)] = v as string;
-      setTags(numericTags);
-      // tips 자동 채우기
-      const numericTips: Record<number, string> = {};
-      for (const [k, v] of Object.entries(data.tips || {})) numericTips[Number(k)] = v as string;
-      setTips(numericTips);
-      setAnalyzeMsg({ type: "success", text: `✅ AI 분석 완료! 태그 ${Object.keys(data.tags || {}).length}개, 학습팁 ${Object.keys(data.tips || {}).length}개 생성됨. 아래에서 확인 후 저장하세요.` });
-      if (paperInputRef.current) paperInputRef.current.value = "";
-    } catch (e: unknown) {
-      setAnalyzeMsg({ type: "error", text: e instanceof Error ? e.message : "오류 발생" });
-    } finally {
-      setAnalyzingPaper(false);
     }
   };
 
@@ -468,34 +409,6 @@ export default function MathTestsPage() {
                       </div>
                     ))}
                   </div>
-                </div>
-
-                {/* AI 시험지 분석 */}
-                <div className="bg-violet-50 dark:bg-violet-900/20 border border-violet-200 dark:border-violet-700 rounded-xl p-4">
-                  <div className="flex items-center gap-2 mb-3">
-                    <span className="text-sm font-semibold text-violet-700 dark:text-violet-400">🤖 시험지 AI 분석</span>
-                    <span className="text-xs text-violet-500 dark:text-violet-500">HWP 또는 PDF 업로드 → 문항별 개념태그·학습팁 자동 생성</span>
-                  </div>
-                  <div className="flex flex-wrap gap-3 items-center">
-                    <input
-                      ref={paperInputRef}
-                      type="file"
-                      accept=".hwp,.pdf"
-                      className="text-sm text-gray-500 dark:text-gray-400 file:mr-3 file:py-1 file:px-3 file:rounded-lg file:border-0 file:text-xs file:bg-violet-100 dark:file:bg-violet-900/40 file:text-violet-700 dark:file:text-violet-400 hover:file:bg-violet-200"
-                    />
-                    <button
-                      onClick={() => analyzePaper(t.id)}
-                      disabled={analyzingPaper}
-                      className="bg-violet-600 hover:bg-violet-700 disabled:opacity-50 text-white px-4 py-1.5 rounded-lg text-sm font-medium transition-colors shadow-sm"
-                    >
-                      {analyzingPaper ? "AI 분석 중..." : "AI 분석 시작"}
-                    </button>
-                  </div>
-                  {analyzeMsg && (
-                    <p className={`text-xs mt-3 px-3 py-2 rounded-lg ${analyzeMsg.type === "success" ? "bg-green-50 dark:bg-green-900/30 text-green-700 dark:text-green-400" : "bg-red-50 dark:bg-red-900/30 text-red-600 dark:text-red-400"}`}>
-                      {analyzeMsg.text}
-                    </p>
-                  )}
                 </div>
 
                 {/* 문항별 태그 입력 */}

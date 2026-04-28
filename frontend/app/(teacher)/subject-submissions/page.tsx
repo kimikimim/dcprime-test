@@ -47,6 +47,7 @@ export default function MathSubmissionsPage() {
   const [expandedId, setExpandedId] = useState<number | null>(null);
   const [detail, setDetail] = useState<MathSubmissionDetail | null>(null);
   const [filterTest, setFilterTest] = useState("");
+  const [searchName, setSearchName] = useState("");
   const [subjectiveEdits, setSubjectiveEdits] = useState<Record<number, string>>({});
   // 답안 수정 상태: { [question_no]: student_answer }
   const [answerEdits, setAnswerEdits] = useState<Record<number, number | null>>({});
@@ -55,11 +56,16 @@ export default function MathSubmissionsPage() {
 
   const load = () => {
     apiFetch<MathTest[]>("/math-tests").then(setTests).catch(() => {});
-    const q = filterTest ? `?test_id=${filterTest}` : "";
-    apiFetch<MathSubmission[]>(`/math-submissions${q}`).then(setSubmissions).catch(() => {});
+    apiFetch<MathSubmission[]>("/math-submissions").then(setSubmissions).catch(() => {});
   };
 
-  useEffect(() => { load(); }, [filterTest]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => { load(); }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const filtered = submissions.filter((s) => {
+    const testOk = !filterTest || String(s.math_test_id) === filterTest;
+    const nameOk = !searchName.trim() || s.student_name.includes(searchName.trim());
+    return testOk && nameOk;
+  });
 
   const upload = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -204,22 +210,34 @@ export default function MathSubmissionsPage() {
       </form>
 
       {/* 필터 */}
-      <div className="flex gap-3 mb-4 items-center">
-        <span className="text-sm text-gray-500 dark:text-gray-400">시험 필터:</span>
-        <select value={filterTest} onChange={(e) => setFilterTest(e.target.value)} className={inputCls}>
-          <option value="">전체</option>
-          {tests.map((t) => <option key={t.id} value={t.id}>{t.title}</option>)}
+      <div className="flex flex-wrap gap-3 mb-4 items-center">
+        <select value={filterTest} onChange={(e) => setFilterTest(e.target.value)} className={inputCls + " w-56"}>
+          <option value="">전체 시험</option>
+          {tests.map((t) => <option key={t.id} value={t.id}>{t.title} ({t.grade})</option>)}
         </select>
+        <input
+          value={searchName}
+          onChange={(e) => setSearchName(e.target.value)}
+          placeholder="학생 이름 검색..."
+          className={inputCls + " w-44"}
+        />
+        {(filterTest || searchName) && (
+          <button onClick={() => { setFilterTest(""); setSearchName(""); }}
+            className="text-xs text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 px-2 py-1 rounded-lg border border-gray-200 dark:border-gray-600">
+            초기화
+          </button>
+        )}
+        <span className="text-xs text-gray-400 dark:text-gray-500">{filtered.length}건</span>
       </div>
 
       {/* 제출 목록 */}
       <div className="space-y-2">
-        {submissions.length === 0 && (
+        {filtered.length === 0 && (
           <div className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl p-8 text-center text-gray-400 dark:text-gray-500 shadow-sm">
-            제출된 답안이 없습니다
+            {submissions.length === 0 ? "제출된 답안이 없습니다" : "검색 결과가 없습니다"}
           </div>
         )}
-        {submissions.map((s) => (
+        {filtered.map((s) => (
           <div key={s.id} className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl overflow-hidden shadow-sm">
             <div className="flex items-center gap-4 px-5 py-3">
               <button onClick={() => toggleExpand(s)} className="flex-1 text-left flex items-center gap-3 hover:text-indigo-700 dark:hover:text-indigo-400 transition-colors">
