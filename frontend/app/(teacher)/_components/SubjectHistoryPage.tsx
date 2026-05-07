@@ -287,10 +287,10 @@ function SubjectHistoryContent({ subject }: { subject: Subject }) {
     <span style="color:#9ca3af;font-size:12px;margin-left:8px;">(객관식 만점 ${oTot}점 + 서술형 만점 ${s.subjective_max}점)</span>
   </div>` : ""}
   <div class="score-grid">
-    <div class="score-card"><div class="label">점수</div><div class="value blue">${oPts + (s.subjective_max != null ? (s.subjective_score ?? 0) : 0)}<span style="font-size:14px;font-weight:400">/${oTot + (s.subjective_max ?? 0)}점</span></div></div>
+    <div class="score-card"><div class="label">점수</div><div class="value blue">${oPts + (s.subjective_max != null ? (s.subjective_score ?? 0) : 0)}점<span style="font-size:14px;font-weight:400">/${oTot + (s.subjective_max ?? 0)}점</span></div></div>
     <div class="score-card"><div class="label">응시자 평균점수</div><div class="value orange">${avgPct != null ? avgPct + "점" : "-"}${avgPct != null ? `<span style="font-size:14px;font-weight:400">/100점</span>` : ""}</div></div>
-    <div class="score-card"><div class="label">백분위</div><div class="value ${diffVal != null ? (50 + diffVal >= 80 ? "blue" : 50 + diffVal >= 60 ? "orange" : "red") : "orange"}">${diffVal != null ? Math.min(99, Math.max(1, 50 + diffVal)) + "점" : "-"}</div></div>
-    <div class="score-card"><div class="label">석차</div><div class="value blue">${rank}<span style="font-size:14px;font-weight:400">/${total}등</span></div></div>
+    <div class="score-card"><div class="label">백분위</div><div class="value ${diffVal != null ? (50 + diffVal >= 80 ? "blue" : 50 + diffVal >= 60 ? "orange" : "red") : "orange"}">${diffVal != null ? Math.min(99, Math.max(1, 50 + diffVal)) + "%" : "-"}</div></div>
+    <div class="score-card"><div class="label">석차</div><div class="value blue">${rank}등<span style="font-size:14px;font-weight:400">/${total}등</span></div></div>
   </div>
   ${s.tendency ? `
   <div class="section-title">출제경향</div>
