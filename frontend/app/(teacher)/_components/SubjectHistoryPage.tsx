@@ -303,17 +303,17 @@ function SubjectHistoryContent({ subject }: { subject: Subject }) {
       const isWrong = iMine ? !iMine.is_correct : false;
       const color = r.rate >= 70 ? "#ef4444" : r.rate >= 40 ? "#f97316" : "#22c55e";
       const barH = Math.max(4, Math.round((r.rate / maxRate) * 80));
-      return `<div style="display:flex;flex-direction:column;align-items:center;gap:2px;min-width:28px;">
-        <span style="font-size:9px;color:#6b7280;">${r.rate}%</span>
-        <div style="width:20px;height:${barH}px;background:${color};border-radius:3px 3px 0 0;${isWrong ? "outline:2px solid #1d4ed8;" : ""}"></div>
-        <span style="font-size:9px;color:${isWrong ? "#1d4ed8" : "#6b7280"};font-weight:${isWrong ? "700" : "400"};">${r.q}</span>
+      return `<div style="display:flex;flex-direction:column;align-items:center;gap:2px;min-width:22px;">
+        <span style="font-size:8px;color:#6b7280;">${r.rate}%</span>
+        <div style="width:16px;height:${barH}px;background:${color};border-radius:3px 3px 0 0;${isWrong ? "outline:2px solid #1d4ed8;" : ""}"></div>
+        <span style="font-size:8px;color:${isWrong ? "#1d4ed8" : "#6b7280"};font-weight:${isWrong ? "700" : "400"};">${r.q}</span>
       </div>`;
     }).join("");
     const highWrong = wrongRates.filter(r => r.rate >= 50).map(r => `<span style="display:inline-block;padding:2px 8px;border-radius:999px;font-size:11px;background:#fee2e2;color:#dc2626;margin:2px;">${r.q} ${r.rate}%</span>`).join("");
     return `<div class="section-title">문항별 오답률 (전체 응시자 기준)</div>
   <div style="background:#f9fafb;border:1px solid #e5e7eb;border-radius:10px;padding:16px;">
     <p style="font-size:11px;color:#9ca3af;margin-bottom:12px;">해당 시험을 응시한 학생 전체의 문항별 오답 비율 / 파란 테두리: 내가 틀린 문항</p>
-    <div style="overflow-x:auto;padding-bottom:4px;"><div style="display:flex;align-items:flex-end;gap:4px;flex-wrap:nowrap;min-width:max-content;">${bars}</div></div>
+    <div style="display:flex;align-items:flex-end;gap:3px;flex-wrap:wrap;">${bars}</div>
     ${highWrong ? `<div style="margin-top:12px;"><span style="font-size:12px;color:#374151;font-weight:600;">오답률 50% 이상: </span>${highWrong}</div>` : ""}
   </div>`;
   })() : ""}
