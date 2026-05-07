@@ -288,11 +288,11 @@ function SubjectHistoryContent({ subject }: { subject: Subject }) {
   </div>` : ""}
   <div class="score-grid">
     <div class="score-card"><div class="label">점수</div><div class="value blue">${oPts + (s.subjective_max != null ? (s.subjective_score ?? 0) : 0)}<span style="font-size:14px;font-weight:400">/${oTot + (s.subjective_max ?? 0)}점</span></div></div>
-    <div class="score-card"><div class="label">정답률</div><div class="value ${pct >= 80 ? "green" : pct >= 60 ? "orange" : "red"}">${pct}%</div></div>
-    <div class="score-card"><div class="label">반 평균</div><div class="value orange">${avgPct != null ? avgPct + "%" : "-"}</div></div>
+    <div class="score-card"><div class="label">응시자 평균점수</div><div class="value orange">${avgPct != null ? avgPct + "점" : "-"}${avgPct != null ? `<span style="font-size:14px;font-weight:400">/100점</span>` : ""}</div></div>
+    <div class="score-card"><div class="label">백분위</div><div class="value ${diffVal != null ? (50 + diffVal >= 80 ? "blue" : 50 + diffVal >= 60 ? "orange" : "red") : "orange"}">${diffVal != null ? Math.min(99, Math.max(1, 50 + diffVal)) + "점" : "-"}</div></div>
     <div class="score-card"><div class="label">석차</div><div class="value blue">${rank}<span style="font-size:14px;font-weight:400">/${total}등</span></div></div>
   </div>
-  ${diffVal != null ? `<p style="margin-top:12px;font-size:13px;color:${diffVal >= 0 ? "#16a34a" : "#dc2626"};font-weight:600;">반 평균 대비: ${diffVal >= 0 ? "▲" : "▼"} ${Math.abs(diffVal)}%p</p>` : ""}
+  ${diffVal != null ? `<p style="margin-top:12px;font-size:13px;color:${diffVal >= 0 ? "#16a34a" : "#dc2626"};font-weight:600;">반 평균 대비: ${diffVal >= 0 ? "▲" : "▼"} ${Math.abs(diffVal)}%p &nbsp;|&nbsp; 백분위: ${Math.min(99, Math.max(1, 50 + diffVal))}점</p>` : ""}
   ${s.tendency ? `
   <div class="section-title">출제경향</div>
   <div style="background:#fffbeb;border:1px solid #fde68a;border-radius:8px;padding:14px 16px;font-size:13px;color:#374151;line-height:1.7;white-space:pre-wrap;">${escHtml(s.tendency)}</div>` : ""}
